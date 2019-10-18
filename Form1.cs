@@ -657,8 +657,6 @@ namespace INFOIBV
             // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
             edge = new int[InputImage.Size.Width, InputImage.Size.Height]; // Initialize boolian array to keep track of boundary pixels
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            bool startFound = false;
-            Point start = Point.Empty;
 
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
@@ -667,59 +665,66 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
+                    Color asdf = OriginalImage[x, y];
+                    if (OriginalImage[x, y] != Color.FromArgb(255, 255, 255) && OriginalImage[x, y] != Color.FromArgb(0, 0, 0))
+                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
                     if (OriginalImage[x, y].R == 255)
-                    {
-                        if (!startFound)
-                        {
-                            start = new Point(x, y);
-                            startFound = true;
-                        }
-                        for (int i = -1; i <= 1; i++) // Check the entire 8-neighbourhood for white pixels                        
-                            for (int j = -1; j <= 1; j++)
-                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && OriginalImage[x + i, y + j].R == 0)
-                                {
-                                    edge[x, y] = 1;
-                                }
-                    }
-                    progressBar.PerformStep();                              // Increment progress bar
+                        edge[x, y] = 1;                             
                 }
+
+            TagZones(edge);
+
             for (int i = 0; i < edge.GetLength(0); i++)
             {
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
-                    if (edge[i, j] == 1)                    
-                        Image[i, j] = Color.White;                    
+                    int tag = edge[i, j];
+                    if (tag == 1)
+                        Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.Black;
+                        Image[i, j] = Color.FromArgb(463 * tag % 256, 231 * tag % 256, 331 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }
             }
         }
 
-        private void FillInZone(int[,] edges)
+        int pixelPart, count = 0;
+        Point lastStop;
+
+        private void TagZones(int[,] edges)
         {
-            bool hasNeighbours = true;
             int tagNr = 2;
-            while (hasNeighbours)
-            {
-                for (int x = 0; x < Image.GetLength(0); x++)
-                    for (int y = 0; y < Image.GetLength(1); y++)
-                        if (edges[x, y] == 1)
-                        { for (int i = -1; i <= 1; i++)
-                            {
-                                for (int j = -1; j <= 1; j++)
-                                {
-                                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                                    {
-                                        if (edges[x + i, y + j] == 0)
-                                            edges[x + i, y + j] = tagNr;
-                                        else if (edge[x + i, y + j] != 1)
-                                            edges[x, y] = edge[x + i, y + j];
-                                    }
-                                }
-                            }
-                            tagNr++;
+            pixelPart = Image.GetLength(0) * Image.GetLength(1) / 4;
+            for (int x = 0; x < Image.GetLength(0); x++)
+                for (int y = 0; y < Image.GetLength(1); y++)
+                    if (edges[x, y] == 0)
+                    {
+                        for (int k = 0; k < 4; k++)
+                        {
+                            RecTag(edges, x, y, tagNr);
                         }
+                        tagNr++;
+                    }            
+        }
+
+        private void RecTag(int[,] edges, int x, int y, int tagNr)
+        {
+            count++;
+            if (count >= pixelPart)
+            {
+                count = 0;
+                lastStop = new Point(x, y);
+                return;
             }
+            if (edges[x, y] == 0)
+                edges[x, y] = tagNr;
+
+            for (int i = -1; i <= 1; i++)            
+                for (int j = -1; j <= 1; j++)                
+                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                    {
+                        if (edges[x + i, y + j] == 0)
+                            RecTag(edges, x + i, y + j, tagNr);
+                    }    
         }
 
         private void SetH()
