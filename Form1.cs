@@ -112,7 +112,7 @@ namespace INFOIBV
                 }
             }
 
-            pictureBox2.Image = (Image)OutputImage;                         // Display output image
+            ap.Image = (Image)OutputImage;                         // Display output image
             progressBar.Visible = false;                                    // Hide progress bar
         }
 
@@ -453,6 +453,53 @@ namespace INFOIBV
             }
         }
 
+        private void GaussianFilter(float sigma, int kernelSize)
+        {
+            double euler = Math.E;
+            if (sigma < 0 || kernelSize < 0)
+                return;
+
+            double[,] weightskernel = new double[kernelSize * 2 + 1, kernelSize * 2 + 1];
+            double total = 0;
+
+            for (int i = -kernelSize; i <= kernelSize; i++)                 // Calculate initial weight for each cell in the kernel
+            {
+                for (int j = -kernelSize; j <= kernelSize; j++)
+                {
+                    double value = Math.Pow(euler, -(i * i + j * j) / (2 * sigma * sigma));
+                    weightskernel[i + kernelSize, j + kernelSize] = value;
+                    total += value;
+                }
+            }
+
+            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            for (int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    OriginalImage[x, y] = Image[x, y];
+                }
+            }
+
+            for (int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    double newGray = 0;
+                    for (int i = -kernelSize; i <= kernelSize; i++)
+                    {
+                        for (int j = -kernelSize; j <= kernelSize; j++)
+                        {
+                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                                newGray += (weightskernel[i + kernelSize, j + kernelSize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
+                        }
+                    }
+                    Image[x, y] = Color.FromArgb((int)newGray, (int)newGray, (int)newGray);     // Update pixel in image
+                    progressBar.PerformStep();                              // Increment progress bar
+                }
+            }
+        }
+
         private void saveButton_Click(object sender, EventArgs e)
         {
             if (OutputImage == null) return;                                // Get out if no output image
@@ -463,8 +510,8 @@ namespace INFOIBV
         private void button1_Click(object sender, EventArgs e)
         {
             if (OutputImage == null) return;                                // Get out if no output image
-            pictureBox1.Image = pictureBox2.Image;
-            InputImage = new Bitmap(pictureBox2.Image);
+            pictureBox1.Image = ap.Image;
+            InputImage = new Bitmap(ap.Image);
         }
     }
 }
