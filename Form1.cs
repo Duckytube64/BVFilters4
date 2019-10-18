@@ -682,15 +682,15 @@ namespace INFOIBV
                 }
 
             // This sequence of entries creates a priority list for Followbounds to follow when searching neighbours
-            // The sequence is clockwise and chooses direct neighbours first and the diagnal neighbours between them second
-            neighbourPriority.Add(new Point(1, 0));
+            // The sequence is counter clockwise
             neighbourPriority.Add(new Point(0, 1));
             neighbourPriority.Add(new Point(1, 1));
-            neighbourPriority.Add(new Point(-1, 0));
-            neighbourPriority.Add(new Point(-1, 1));
+            neighbourPriority.Add(new Point(1, 0));
+            neighbourPriority.Add(new Point(1, -1));
             neighbourPriority.Add(new Point(0, -1));
             neighbourPriority.Add(new Point(-1, -1));
-            neighbourPriority.Add(new Point(1, -1));
+            neighbourPriority.Add(new Point(-1, 0));
+            neighbourPriority.Add(new Point(-1, 1));
 
             List<Point> sequence = new List<Point>();
             sequence.Add(start);
