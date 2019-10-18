@@ -18,7 +18,8 @@ namespace INFOIBV
         Color[,] Image;
         bool doubleProgress = false;
         string modeSize, mode;
-        bool[,] edge, H;
+        int[,] edge;
+        bool[,] H;
 
         public INFOIBV()
         {
@@ -425,7 +426,12 @@ namespace INFOIBV
                                 totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
                                 totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];
                             }
-                            // If the selected pixel is out of bounds, count that pixel value as 0, which does nothing
+                            else
+                            {
+                                totalX += 255 * edgeFilterX[i + 1, j + 1];
+                                totalY += 255 * edgeFilterY[i + 1, j + 1];
+                            }
+                            // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                         }
                     }
                     totalX *= normalisationFactor;
@@ -645,7 +651,76 @@ namespace INFOIBV
             label1.Text = "Aantal values: " + valuecounter;
         }
 
+        private void BoundaryTrace()
+        {
+            // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
+            // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
+            edge = new int[InputImage.Size.Width, InputImage.Size.Height]; // Initialize boolian array to keep track of boundary pixels
+            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            bool startFound = false;
+            Point start = Point.Empty;
 
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                    OriginalImage[x, y] = Image[x, y];
+
+            for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    if (OriginalImage[x, y].R == 255)
+                    {
+                        if (!startFound)
+                        {
+                            start = new Point(x, y);
+                            startFound = true;
+                        }
+                        for (int i = -1; i <= 1; i++) // Check the entire 8-neighbourhood for white pixels                        
+                            for (int j = -1; j <= 1; j++)
+                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && OriginalImage[x + i, y + j].R == 0)
+                                {
+                                    edge[x, y] = 1;
+                                }
+                    }
+                    progressBar.PerformStep();                              // Increment progress bar
+                }
+            for (int i = 0; i < edge.GetLength(0); i++)
+            {
+                for (int j = 0; j < edge.GetLength(1); j++)
+                {
+                    if (edge[i, j] == 1)                    
+                        Image[i, j] = Color.White;                    
+                    else
+                        Image[i, j] = Color.Black;
+                }
+            }
+        }
+
+        private void FillInZone(int[,] edges)
+        {
+            bool hasNeighbours = true;
+            int tagNr = 2;
+            while (hasNeighbours)
+            {
+                for (int x = 0; x < Image.GetLength(0); x++)
+                    for (int y = 0; y < Image.GetLength(1); y++)
+                        if (edges[x, y] == 1)
+                        { for (int i = -1; i <= 1; i++)
+                            {
+                                for (int j = -1; j <= 1; j++)
+                                {
+                                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                                    {
+                                        if (edges[x + i, y + j] == 0)
+                                            edges[x + i, y + j] = tagNr;
+                                        else if (edge[x + i, y + j] != 1)
+                                            edges[x, y] = edge[x + i, y + j];
+                                    }
+                                }
+                            }
+                            tagNr++;
+                        }
+            }
+        }
 
         private void SetH()
         {
