@@ -18,7 +18,6 @@ namespace INFOIBV
         Color[,] Image;
         bool doubleProgress = false;
         string modeSize, mode;
-        int[,] edge;
         bool[,] H;
 
         public INFOIBV()
@@ -651,6 +650,8 @@ namespace INFOIBV
             label1.Text = "Aantal values: " + valuecounter;
         }
 
+        int[,] edge;
+
         private void BoundaryTrace()
         {
             // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
@@ -672,7 +673,7 @@ namespace INFOIBV
                         edge[x, y] = 1;                             
                 }
 
-            TagZones(edge);
+            TagZones();
 
             for (int i = 0; i < edge.GetLength(0); i++)
             {
@@ -687,44 +688,39 @@ namespace INFOIBV
             }
         }
 
-        int pixelPart, count = 0;
-        Point lastStop;
+        int tagNr = 2;
 
-        private void TagZones(int[,] edges)
+        private void TagZones()
         {
-            int tagNr = 2;
-            pixelPart = Image.GetLength(0) * Image.GetLength(1) / 4;
             for (int x = 0; x < Image.GetLength(0); x++)
                 for (int y = 0; y < Image.GetLength(1); y++)
-                    if (edges[x, y] == 0)
+                    if (edge[x, y] == 0)
                     {
-                        for (int k = 0; k < 4; k++)
-                        {
-                            RecTag(edges, x, y, tagNr);
-                        }
+                        FloodFill(x, y);
                         tagNr++;
-                    }            
+                    }
         }
 
-        private void RecTag(int[,] edges, int x, int y, int tagNr)
+        private void FloodFill(int startx, int starty)
         {
-            count++;
-            if (count >= pixelPart)
-            {
-                count = 0;
-                lastStop = new Point(x, y);
-                return;
-            }
-            if (edges[x, y] == 0)
-                edges[x, y] = tagNr;
+            Stack<Point> zonePoints = new Stack<Point>();
+            zonePoints.Push(new Point(startx, starty));
 
-            for (int i = -1; i <= 1; i++)            
-                for (int j = -1; j <= 1; j++)                
-                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                    {
-                        if (edges[x + i, y + j] == 0)
-                            RecTag(edges, x + i, y + j, tagNr);
-                    }    
+            while (zonePoints.Count > 0)
+            {
+                Point currPos = zonePoints.Pop();
+                int x = currPos.X, y = currPos.Y;
+
+                edge[x, y] = tagNr;
+
+                for (int i = -1; i <= 1; i++)
+                    for (int j = -1; j <= 1; j++)
+                        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                        {
+                            if (edge[x + i, y + j] == 0)
+                                zonePoints.Push(new Point(x + i, y + j));
+                        }
+            }
         }
 
         private void SetH()
