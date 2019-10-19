@@ -19,6 +19,7 @@ namespace INFOIBV
         bool doubleProgress = false;
         string modeSize, mode;
         bool[,] H;
+        int rounds;
 
         public INFOIBV()
         {
@@ -89,13 +90,11 @@ namespace INFOIBV
             progressBar.Step = 1;
 
             // Copy input Bitmap to array            
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Image[x, y] = InputImage.GetPixel(x, y);                // Set pixel color in array at (x,y)
-                }
-            }
+                }            
 
             //==========================================================================================
             // TODO: include here your own code
@@ -113,43 +112,113 @@ namespace INFOIBV
                     ContrastAdjustment();
                     break;
                 case ("Linear filter"):
-                    LinearFilter();
+                    int kernelsize;
+                    try
+                    {
+                        kernelsize = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    LinearFilter(kernelsize);
                     break;
                 case ("Nonlinear filter"):
-                    NonlinearFilter();
+                    int medianSize;
+                    try
+                    {
+                        medianSize = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    NonlinearFilter(medianSize);
                     break;
                 case ("Gaussian filter"):
-                    GaussianFilter();
+                    float sigma;
+                    int kernelSize;
+                    try
+                    {
+                        kernelSize = int.Parse(textBox2.Text);                      // Try to get the kernelsize by parsing
+                        sigma = float.Parse(textBox1.Text);                         // Try to get the sigma by parsing
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    GaussianFilter(kernelSize, sigma);
                     break;
                 case ("Edge detection"):
-                    EdgeDetection();
+                    EdgeDetection(comboBox2.Text);
                     break;
                 case ("Thresholding"):
-                    Thresholding();
+                    int threshold;
+                    try
+                    {
+                        threshold = int.Parse(textBox1.Text);                       // Try to get the threshold by parsing
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    Thresholding(threshold);
                     break;
                 case ("Erosion"):
-                    ErosionOrDialation(true);
+                    try
+                    {
+                        rounds = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    ErosionOrDialation(true, rounds);
                     break;
                 case ("Dilation"):
-                    ErosionOrDialation(false);
+                    try
+                    {
+                        rounds = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    ErosionOrDialation(false, rounds);
                     break;
                 case ("Opening"):
+                    try
+                    {
+                        rounds = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
                     doubleProgress = true;
-                    ErosionOrDialation(true);
-                    ErosionOrDialation(false);
+                    ErosionOrDialation(true, rounds);
+                    ErosionOrDialation(false, rounds);
                     doubleProgress = false;
                     break;
-                case ("Closing"):
+                case ("Closing"):       // Deze kan misschien wel helpen om details uit de scene te halen en edge detection van het object als geheel makkelijker te maken
+                    try
+                    {
+                        rounds = int.Parse(textBox1.Text);
+                    }
+                    catch
+                    {
+                        return;
+                    }
                     doubleProgress = true;
-                    ErosionOrDialation(false);
-                    ErosionOrDialation(true);
+                    ErosionOrDialation(false, rounds);
+                    ErosionOrDialation(true, rounds);
                     doubleProgress = false;
                     break;
                 case ("Value counting"):
                     ValueCounting();
                     break;
-                case ("Boundary trace"):
-                    BoundaryTrace();
+                case ("Tag zones"):
+                    TagZones();
                     break;
                 case ("Nothing"):
                 default:
@@ -172,22 +241,19 @@ namespace INFOIBV
 
         private void Negative()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     Color updatedColor = Color.FromArgb(255 - pixelColor.R, 255 - pixelColor.G, 255 - pixelColor.B); // Negative image
                     Image[x, y] = updatedColor;                             // Set the new pixel color at coordinate (x,y)
                     progressBar.PerformStep();                              // Increment progress bar
-                }
-            }
+                }            
         }
 
         private void Grayscale()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
@@ -195,8 +261,7 @@ namespace INFOIBV
                     Color updatedColor = Color.FromArgb(Clinear, Clinear, Clinear); // Grayscale image
                     Image[x, y] = updatedColor;                             // Set the new pixel color at coordinate (x,y)
                     progressBar.PerformStep();                              // Increment progress bar
-                }
-            }
+                }            
         }
 
         private void ContrastAdjustment()
@@ -207,7 +272,10 @@ namespace INFOIBV
             {
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
-                    byte value = Image[x, y].R;                             // Get the pixel color at coordinate (x,y)
+                    Color color = Image[x, y];
+                    if (color.R != color.G || color.R != color.B)
+                        throw new ConstraintException("Input image moet grayscale zijn");
+                    byte value = color.R;                               // Get the pixel color at coordinate (x,y)
                     if (value > maximumValue)                               // Get the lowest and highest grayscale values of the picture
                         maximumValue = value;
                     if (value < minimumValue)
@@ -229,19 +297,8 @@ namespace INFOIBV
             }
         }
 
-        private void LinearFilter()
+        private void LinearFilter(int kernelsize)
         {
-            int kernalsize;
-
-            try
-            {
-                kernalsize = int.Parse(textBox1.Text);
-            }
-            catch
-            {
-                return;
-            }
-
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
             for (int x = 0; x < InputImage.Size.Width; x++)
             {
@@ -251,16 +308,16 @@ namespace INFOIBV
                 }
             }
 
-            int totalsize = (2 * kernalsize + 1) * (2 * kernalsize + 1);
+            int totalsize = (2 * kernelsize + 1) * (2 * kernelsize + 1);
 
             for (int x = 0; x < InputImage.Size.Width; x++)
             {
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     int totalvalue = 0;
-                    for (int i = 0 - kernalsize; i <= kernalsize; i++)               // Loop over all pixels in the kernal and add their value to total value
+                    for (int i = 0 - kernelsize; i <= kernelsize; i++)               // Loop over all pixels in the kernel and add their value to total value
                     {
-                        for (int j = 0 - kernalsize; j <= kernalsize; j++)
+                        for (int j = 0 - kernelsize; j <= kernelsize; j++)
                         {
                             if (x + i >= 0 && y + j >= 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height)        // If a pixel is out of image bounds, it has value 0
                                 totalvalue += OriginalImage[x + i, y + j].R;
@@ -274,19 +331,8 @@ namespace INFOIBV
             }
         }
 
-        private void NonlinearFilter()
+        private void NonlinearFilter(int medianSize)
         {
-            int medianSize;
-
-            try
-            {
-                medianSize = int.Parse(textBox1.Text);
-            }
-            catch
-            {
-                return;
-            }
-
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
             for (int x = 0; x < InputImage.Size.Width; x++)
             {
@@ -324,33 +370,22 @@ namespace INFOIBV
             }
         }
 
-        private void GaussianFilter()
+        private void GaussianFilter(int kernelsize, float sigma)
         {
             double euler = Math.E;
-            float sigma;
-            int kernelSize;
 
-            try
-            {
-                sigma = float.Parse(textBox1.Text);                         // Try to get the sigma by parsing
-                kernelSize = int.Parse(textBox2.Text);                      // Try to get the kernelsize by parsing
-            }
-            catch
-            {
-                return;
-            }
-            if (sigma < 0 || kernelSize < 0)
+            if (sigma < 0 || kernelsize < 0)
                 return;
 
-            double[,] weightskernel = new double[kernelSize * 2 + 1, kernelSize * 2 + 1];
+            double[,] weightskernel = new double[kernelsize * 2 + 1, kernelsize * 2 + 1];
             double total = 0;
 
-            for (int i = -kernelSize; i <= kernelSize; i++)                 // Calculate initial weight for each cell in the kernel
+            for (int i = -kernelsize; i <= kernelsize; i++)                 // Calculate initial weight for each cell in the kernel
             {
-                for (int j = -kernelSize; j <= kernelSize; j++)
+                for (int j = -kernelsize; j <= kernelsize; j++)
                 {
                     double value = Math.Pow(euler, -(i * i + j * j) / (2 * sigma * sigma));
-                    weightskernel[i + kernelSize, j + kernelSize] = value;
+                    weightskernel[i + kernelsize, j + kernelsize] = value;
                     total += value;
                 }
             }
@@ -369,12 +404,12 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     double newGray = 0;
-                    for (int i = -kernelSize; i <= kernelSize; i++)
+                    for (int i = -kernelsize; i <= kernelsize; i++)
                     {
-                        for (int j = -kernelSize; j <= kernelSize; j++)
+                        for (int j = -kernelsize; j <= kernelsize; j++)
                         {
                             if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
-                                newGray += (weightskernel[i + kernelSize, j + kernelSize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
+                                newGray += (weightskernel[i + kernelsize, j + kernelsize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
                         }
                     }
                     Image[x, y] = Color.FromArgb((int)newGray, (int)newGray, (int)newGray);     // Update pixel in image
@@ -383,13 +418,13 @@ namespace INFOIBV
             }
         }
 
-        private void EdgeDetection()
+        private void EdgeDetection(string filter)
         {
             double normalisationFactor;
-            double[,] edgeFilterX = GetEDFilter(comboBox2.Text + "x");
-            double[,] edgeFilterY = GetEDFilter(comboBox2.Text + "y");
+            double[,] edgeFilterX = GetEDFilter(filter + "x");
+            double[,] edgeFilterY = GetEDFilter(filter + "y");
 
-            switch (comboBox2.Text)
+            switch (filter)
             {
                 case ("Prewitt"):
                     normalisationFactor = 1f / 6f;
@@ -442,32 +477,21 @@ namespace INFOIBV
             }
         }
 
-        private void Thresholding()
+        private void Thresholding(int threshold)
         {
-            int threshold;
-            try
-            {
-                threshold = int.Parse(textBox1.Text);                       // Try to get the threshold by parsing
-            }
-            catch
-            {
-                return;
-            }
-
-            threshold = Math.Max(0, Math.Min(255, threshold));              // Clamp threshold between 0 and 255              
-
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            threshold = Math.Max(0, Math.Min(255, threshold));              // Clamp threshold between 0 and 255         
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
+                    if (pixelColor.R != pixelColor.G || pixelColor.R != pixelColor.B)
+                        throw new ConstraintException("Input image moet grayscale zijn");
                     if (pixelColor.R > threshold)                           // Set color to black if grayscale (thus either R, G or B) is above threshold, else make the color white
                         Image[x, y] = Color.White;
                     else
                         Image[x, y] = Color.Black;
                     progressBar.PerformStep();                              // Increment progress bar
-                }
-            }
+                }            
         }
 
         private double[,] GetEDFilter(string filterName)
@@ -512,62 +536,13 @@ namespace INFOIBV
             }
         }
 
-        private void GaussianFilter(float sigma, int kernelSize)
-        {
-            double euler = Math.E;
-            if (sigma < 0 || kernelSize < 0)
-                return;
-
-            double[,] weightskernel = new double[kernelSize * 2 + 1, kernelSize * 2 + 1];
-            double total = 0;
-
-            for (int i = -kernelSize; i <= kernelSize; i++)                 // Calculate initial weight for each cell in the kernel
-            {
-                for (int j = -kernelSize; j <= kernelSize; j++)
-                {
-                    double value = Math.Pow(euler, -(i * i + j * j) / (2 * sigma * sigma));
-                    weightskernel[i + kernelSize, j + kernelSize] = value;
-                    total += value;
-                }
-            }
-
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
-                for (int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }
-            }
-
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
-                for (int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    double newGray = 0;
-                    for (int i = -kernelSize; i <= kernelSize; i++)
-                    {
-                        for (int j = -kernelSize; j <= kernelSize; j++)
-                        {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
-                                newGray += (weightskernel[i + kernelSize, j + kernelSize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
-                        }
-                    }
-                    Image[x, y] = Color.FromArgb((int)newGray, (int)newGray, (int)newGray);     // Update pixel in image
-                    progressBar.PerformStep();                              // Increment progress bar
-                }
-            }
-        }
-
-        private void ErosionOrDialation(bool IsErosion)
+        private void ErosionOrDialation(bool IsErosion, int rounds)
         {
             int size;
             int baseMinColor;
-            int rounds;
             try
             {
                 size = int.Parse(modeSize) - 1;
-                rounds = int.Parse(textBox1.Text);
             }
             catch
             {
@@ -627,8 +602,7 @@ namespace INFOIBV
             chart1.ResetAutoValues();
             int[] values = new int[256];
             int valuecounter = 0;
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     int value = Image[x, y].R;
@@ -638,28 +612,25 @@ namespace INFOIBV
                     }
                     values[value]++;
                     progressBar.PerformStep();                              // Increment progress bar
-                }
-            }
+                }            
 
             var values1 = chart1.Series.Add("Values");
-            for (int i = 0; i < 256; i++)
-            {
-                values1.Points.AddY(values[i]);
-            }
+            for (int i = 0; i < 256; i++)            
+                values1.Points.AddY(values[i]);            
 
             label1.Text = "Aantal values: " + valuecounter;
         }
 
         int[,] edge;
+        int tagNr;
 
-        private void BoundaryTrace()
+        private void TagZones()
         {
-            // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
-            // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
-            edge = new int[InputImage.Size.Width, InputImage.Size.Height]; // Initialize boolian array to keep track of boundary pixels
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
+            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
+            tagNr = 2;
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < InputImage.Size.Width; x++)                 // Duplicate the original image
                 for (int y = 0; y < InputImage.Size.Height; y++)
                     OriginalImage[x, y] = Image[x, y];
 
@@ -673,32 +644,26 @@ namespace INFOIBV
                         edge[x, y] = 1;                             
                 }
 
-            TagZones();
+            for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
+                for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
+                {
+                    if (edge[x, y] == 0)
+                    {
+                        FloodFill(x, y);
+                        tagNr++;
+                    }
+                    progressBar.PerformStep();                              // Increment progress bar
+                }
 
-            for (int i = 0; i < edge.GetLength(0); i++)
-            {
+            for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
                     int tag = edge[i, j];
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.FromArgb(463 * tag % 256, 231 * tag % 256, 331 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
-                }
-            }
-        }
-
-        int tagNr = 2;
-
-        private void TagZones()
-        {
-            for (int x = 0; x < Image.GetLength(0); x++)
-                for (int y = 0; y < Image.GetLength(1); y++)
-                    if (edge[x, y] == 0)
-                    {
-                        FloodFill(x, y);
-                        tagNr++;
-                    }
+                        Image[i, j] = Color.FromArgb(463 * tag % 256, 233 * tag % 256, 331 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                }            
         }
 
         private void FloodFill(int startx, int starty)
@@ -711,7 +676,7 @@ namespace INFOIBV
                 Point currPos = zonePoints.Pop();
                 int x = currPos.X, y = currPos.Y;
 
-                edge[x, y] = tagNr;
+                edge[x,y] = tagNr;
 
                 for (int i = -1; i <= 1; i++)
                     for (int j = -1; j <= 1; j++)

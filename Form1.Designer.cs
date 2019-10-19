@@ -154,7 +154,7 @@
             "Opening",
             "Closing",
             "Value counting",
-            "Boundary trace"});
+            "Tag zones"});
             this.comboBox1.Location = new System.Drawing.Point(1121, 17);
             this.comboBox1.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.comboBox1.Name = "comboBox1";
@@ -292,7 +292,7 @@
             else if (selected == "Linear filter")
             {
                 this.textBox1.Visible = true;
-                this.textBox1.Text = "kernalsize";
+                this.textBox1.Text = "kernelsize";
             }
             else if (selected == "Gaussian filter")
             {
