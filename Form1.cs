@@ -16,8 +16,8 @@ namespace INFOIBV
         private Bitmap InputImage;
         private Bitmap OutputImage;
         Color[,] Image;
-        bool doubleProgress = false;
-        string modeSize, mode;
+        bool doubleProgress = false, pipelineing = false;
+        string mode;
         bool[,] H;
         int rounds;
 
@@ -52,29 +52,16 @@ namespace INFOIBV
             string filter = (string)comboBox1.SelectedItem;
             if (filter == "Structuring element")                            // This function should also work when no image is chosen yet
             {
-                mode = comboBox3.Text;
-                modeSize = textBox2.Text;
-                SetH();
-
-                string message = "Structuring element set as: \n";
-                int size = int.Parse(modeSize);
-                for (int x = 0; x < size * 2 - 1; x++)
+                int size;
+                try
                 {
-                    for (int y = 0; y < size * 2 - 1; y++)
-                    {
-                        if (H[x, y])
-                        {
-                            message += "1 ";
-                        }
-                        else
-                        {
-                            message += "0 ";
-                        }
-                    }
-                    message += "\n";
+                    size = int.Parse(textBox2.Text);
                 }
-
-                MessageBox.Show(message, "Structuring element visual", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                catch
+                {
+                    return;
+                }
+                StructuringElement(comboBox3.Text, size);
             }
 
             if (InputImage == null) return;                                 // Get out if no input image
@@ -195,10 +182,7 @@ namespace INFOIBV
                     {
                         return;
                     }
-                    doubleProgress = true;
-                    ErosionOrDialation(true, rounds);
-                    ErosionOrDialation(false, rounds);
-                    doubleProgress = false;
+                    Opening(rounds);
                     break;
                 case ("Closing"):       // Deze kan misschien wel helpen om details uit de scene te halen en edge detection van het object als geheel makkelijker te maken
                     try
@@ -209,16 +193,16 @@ namespace INFOIBV
                     {
                         return;
                     }
-                    doubleProgress = true;
-                    ErosionOrDialation(false, rounds);
-                    ErosionOrDialation(true, rounds);
-                    doubleProgress = false;
+                    Closing(rounds);
                     break;
                 case ("Value counting"):
                     ValueCounting();
                     break;
                 case ("Tag zones"):
                     TagZones();
+                    break;
+                case ("Pipeline v0"):
+                    PipelineV0();
                     break;
                 case ("Nothing"):
                 default:
@@ -241,27 +225,29 @@ namespace INFOIBV
 
         private void Negative()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)            
+            for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     Color updatedColor = Color.FromArgb(255 - pixelColor.R, 255 - pixelColor.G, 255 - pixelColor.B); // Negative image
                     Image[x, y] = updatedColor;                             // Set the new pixel color at coordinate (x,y)
-                    progressBar.PerformStep();                              // Increment progress bar
-                }            
+                    if (!pipelineing)
+                        progressBar.PerformStep();            // Increment progress bar
+                }
         }
 
         private void Grayscale()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)            
+            for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     int Clinear = (int)(0.2126f * pixelColor.R + 0.7152 * pixelColor.G + 0.0722 * pixelColor.B); // Calculate grayscale
                     Color updatedColor = Color.FromArgb(Clinear, Clinear, Clinear); // Grayscale image
                     Image[x, y] = updatedColor;                             // Set the new pixel color at coordinate (x,y)
-                    progressBar.PerformStep();                              // Increment progress bar
-                }            
+                    if (!pipelineing)
+                        progressBar.PerformStep();            // Increment progress bar
+                }         
         }
 
         private void ContrastAdjustment()
@@ -286,13 +272,14 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)
             {
                 for (int y = 0; y < InputImage.Size.Height; y++)
-                {               
+                {
                     float value = Image[x, y].R;                            // Get the pixel grayscale color at coordinate (x,y)
                     value -= minimumValue;                                  // Calculate the pixel's "grayness" as a percent between minimum- and maximumValue
                     value /= (maximumValue - minimumValue);
                     int grayColor = (int)(255 * value);
                     Image[x, y] = Color.FromArgb(grayColor, grayColor, grayColor);   // Set pixel's color to be this same percent of grayness, but then between 0 and 255
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();                     // Increment progress bar
                 }
             }
         }
@@ -347,7 +334,7 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)
             {
                 for (int y = 0; y < InputImage.Size.Height; y++)
-                {                   
+                {
                     float value = Image[x, y].R;                            // Get the pixel color at coordinate (x,y)
                     int counter = 0;
                     for (int i = -medianSize; i <= medianSize; i++)         // Get color values for all pixels in median range
@@ -365,7 +352,8 @@ namespace INFOIBV
                     Array.Sort(pixelValues);
                     int newValue = (int)pixelValues[pixelValues.Length / 2 + 1];
                     Image[x, y] = Color.FromArgb(newValue, newValue, newValue);     // Set the new pixel color at coordinate (x,y)
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();                    // Increment progress bar
                 }
             }
         }
@@ -413,7 +401,8 @@ namespace INFOIBV
                         }
                     }
                     Image[x, y] = Color.FromArgb((int)newGray, (int)newGray, (int)newGray);     // Update pixel in image
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();                                // Increment progress bar
                 }
             }
         }
@@ -472,7 +461,8 @@ namespace INFOIBV
                     totalY *= normalisationFactor;
                     double EdgeStrength = Math.Sqrt(totalX * totalX + totalY * totalY);
                     Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();            // Increment progress bar
                 }
             }
         }
@@ -480,7 +470,7 @@ namespace INFOIBV
         private void Thresholding(int threshold)
         {
             threshold = Math.Max(0, Math.Min(255, threshold));              // Clamp threshold between 0 and 255         
-            for (int x = 0; x < InputImage.Size.Width; x++)            
+            for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
@@ -490,8 +480,38 @@ namespace INFOIBV
                         Image[x, y] = Color.White;
                     else
                         Image[x, y] = Color.Black;
-                    progressBar.PerformStep();                              // Increment progress bar
-                }            
+                    if (!pipelineing)
+                        progressBar.PerformStep();            // Increment progress bar
+                }          
+        }
+
+        private void StructuringElement(string Mode, int size)
+        {
+            mode = Mode;
+            SetH(size);
+
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException("size has to be greater than 0");
+
+            string message = "Structuring element set as: \n";
+            for (int x = 0; x < size * 2 - 1; x++)
+            {
+                for (int y = 0; y < size * 2 - 1; y++)
+                {
+                    if (H[x, y])
+                    {
+                        message += "1 ";
+                    }
+                    else
+                    {
+                        message += "0 ";
+                    }
+                }
+                message += "\n";
+            }
+
+            if (!pipelineing)
+                MessageBox.Show(message, "Structuring element visual", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private double[,] GetEDFilter(string filterName)
@@ -538,16 +558,11 @@ namespace INFOIBV
 
         private void ErosionOrDialation(bool IsErosion, int rounds)
         {
-            int size;
+            int size = H.GetLength(0) / 2;
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException("size has to be greater than 0");
+
             int baseMinColor;
-            try
-            {
-                size = int.Parse(modeSize) - 1;
-            }
-            catch
-            {
-                return;
-            }
 
             if (IsErosion)
                 baseMinColor = 0;
@@ -586,14 +601,30 @@ namespace INFOIBV
                         Image[x, y] = Color.FromArgb(minColor, minColor, minColor);         // Set the new pixel color at coordinate (x,y)
                         if (doubleProgress)
                         {
-                            if (y % (rounds * 2) == 0)
+                            if (y % (rounds * 2) == 0 && !pipelineing)
                                 progressBar.PerformStep();                          // Increment progress bar
                         }
-                        else if (y % rounds == 0)
+                        else if (y % rounds == 0 && !pipelineing)
                             progressBar.PerformStep();                              // Increment progress bar
                     }
                 }
             }
+        }
+
+        private void Closing(int rounds)
+        {
+            doubleProgress = true;
+            ErosionOrDialation(false, rounds);
+            ErosionOrDialation(true, rounds);
+            doubleProgress = false;
+        }
+
+        private void Opening(int rounds)
+        {
+            doubleProgress = true;
+            ErosionOrDialation(true, rounds);
+            ErosionOrDialation(false, rounds);
+            doubleProgress = false;
         }
 
         private void ValueCounting()
@@ -602,7 +633,7 @@ namespace INFOIBV
             chart1.ResetAutoValues();
             int[] values = new int[256];
             int valuecounter = 0;
-            for (int x = 0; x < InputImage.Size.Width; x++)            
+            for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     int value = Image[x, y].R;
@@ -611,7 +642,8 @@ namespace INFOIBV
                         valuecounter++;
                     }
                     values[value]++;
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();                    // Increment progress bar
                 }            
 
             var values1 = chart1.Series.Add("Values");
@@ -638,7 +670,7 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     Color asdf = OriginalImage[x, y];
-                    if (OriginalImage[x, y] != Color.FromArgb(255, 255, 255) && OriginalImage[x, y] != Color.FromArgb(0, 0, 0))
+                    if (OriginalImage[x, y] != Color.White && OriginalImage[x, y] != Color.Black)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
                     if (OriginalImage[x, y].R == 255)
                         edge[x, y] = 1;                             
@@ -652,8 +684,34 @@ namespace INFOIBV
                         FloodFill(x, y);
                         tagNr++;
                     }
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                        progressBar.PerformStep();    // Increment progress bar
                 }
+
+            for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
+                for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
+                    if (edge[x, y] == 1)
+                    {
+                        int[] tagNeighborhood = new int[tagNr];
+                        int minTagVal = 8;
+                        int minTag = 1;
+
+                        for (int i = -1; i <= 1; i++)
+                            for (int j = -1; j <= 1; j++)
+                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1) && !(x + i == 0 && y + j == 0))
+                                {
+                                    tagNeighborhood[edge[x + i, y + j]]++;
+                                }
+                        for (int k = 0; k < tagNr; k++)
+                        {
+                            if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)
+                            {
+                                minTagVal = tagNeighborhood[k];
+                                minTag = k;
+                            }
+                        }
+                        edge[x, y] = minTag;
+                    }
 
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
@@ -662,7 +720,7 @@ namespace INFOIBV
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.FromArgb(463 * tag % 256, 233 * tag % 256, 331 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                        Image[i, j] = Color.FromArgb(463 * tag % 256, 233 * tag % 256, 337 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }            
         }
 
@@ -684,17 +742,20 @@ namespace INFOIBV
                         {
                             if (edge[x + i, y + j] == 0)
                                 zonePoints.Push(new Point(x + i, y + j));
+                            else if (edge[x + i, y + j] == 1)
+                                edge[x + i, y + j] = tagNr;
                         }
             }
         }
 
-        private void SetH()
+        private void SetH(int size)
         {
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException("size has to be greater than 0");
+
             bool[,] newH = new bool[3, 3];
-            int size;
             try
             {
-                size = int.Parse(modeSize);                     // Try to get the inputted size - if it's a number
                 newH = new bool[size * 2 - 1, size * 2 - 1];
             }
             catch
@@ -718,6 +779,26 @@ namespace INFOIBV
                 }
             }
             H = newH;
+        }
+
+        private void PipelineV0()
+        {
+            // Every method increases the progress bar as if it were the only method changing it
+            // Because we now use multiple methods at once, the progress bar would exceed 100%,
+            // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
+            // and add a 'manual' progress bar
+            pipelineing = true;                 
+
+            Grayscale();                
+            ContrastAdjustment();      
+            StructuringElement("Rectangle", 2);
+            Closing(1);
+            EdgeDetection("Sobel");
+            ContrastAdjustment();
+            Thresholding(40);
+            TagZones();
+
+            pipelineing = false;
         }
 
         private void saveButton_Click(object sender, EventArgs e)

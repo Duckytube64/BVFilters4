@@ -154,7 +154,8 @@
             "Opening",
             "Closing",
             "Value counting",
-            "Tag zones"});
+            "Tag zones",
+            "Pipeline v0"});
             this.comboBox1.Location = new System.Drawing.Point(1121, 17);
             this.comboBox1.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.comboBox1.Name = "comboBox1";
