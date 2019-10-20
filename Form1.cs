@@ -781,16 +781,21 @@ namespace INFOIBV
             H = newH;
         }
 
+
+        // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
+        // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
         private void PipelineV0()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            // and add a 'manual' progress bar
-            pipelineing = true;                 
+            Color[,] OriginalImage = Image, GrayImage;
 
-            Grayscale();                
-            ContrastAdjustment();      
+            pipelineing = true;
+
+            Grayscale();
+            ContrastAdjustment();
+            GrayImage = Image;
             StructuringElement("Rectangle", 2);
             Closing(1);
             EdgeDetection("Sobel");
