@@ -467,9 +467,12 @@ namespace INFOIBV
             }
         }
 
+        int[,] edge;
+
         private void Thresholding(int threshold)
         {
-            threshold = Math.Max(0, Math.Min(255, threshold));              // Clamp threshold between 0 and 255         
+            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
+            threshold = Math.Max(0, Math.Min(255, threshold));                  // Clamp threshold between 0 and 255         
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
@@ -477,12 +480,58 @@ namespace INFOIBV
                     if (pixelColor.R != pixelColor.G || pixelColor.R != pixelColor.B)
                         throw new ConstraintException("Input image moet grayscale zijn");
                     if (pixelColor.R > threshold)                           // Set color to black if grayscale (thus either R, G or B) is above threshold, else make the color white
+                    {
                         Image[x, y] = Color.White;
+                        edge[x, y] = 1;
+                    }
                     else
                         Image[x, y] = Color.Black;
                     if (!pipelineing)
                         progressBar.PerformStep();            // Increment progress bar
-                }          
+                }
+        }
+
+        private void ReduceBinaryNoise()
+        {
+            bool[,] covered = new bool[Image.GetLength(0), Image.GetLength(1)];
+            for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
+                for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
+                {
+                    if (edge[x, y] == 1 && !covered[x, y])
+                    {
+                        Stack<Point> zonePointsStack = new Stack<Point>();
+                        List<Point> zonePoints = new List<Point>();
+                        zonePointsStack.Push(new Point(x, y));
+                        zonePoints.Add(new Point(x, y));
+                        covered[x, y] = true;
+
+                        while (zonePointsStack.Count > 0)
+                        {
+                            Point currPos = zonePointsStack.Pop();
+                            int X = currPos.X, Y = currPos.Y;
+
+                            for (int i = -1; i <= 1; i++)
+                                for (int j = -1; j <= 1; j++)
+                                    if (X + i >= 0 && X + i < Image.GetLength(0) && Y + j >= 0 && Y + j < Image.GetLength(1))
+                                    {
+                                        if (edge[X + i, Y + j] == 1 && !covered[X + i, Y + j])
+                                        {
+                                            zonePointsStack.Push(new Point(X + i, Y + j));
+                                            zonePoints.Add(new Point(X + i, Y + j));
+                                            covered[X, Y] = true;
+                                        }
+                                    }
+                        }
+
+                        // If an edge segment covers less than 0.1% of the pixels, its probably not a mug, so we remove it from the image
+                        if (zonePoints.Count < (float)(Image.GetLength(0) * Image.GetLength(1)) / 100 * 0.1f)
+                            foreach(Point p in zonePoints)
+                            {
+                                edge[p.X, p.Y] = 0;
+                                Image[p.X, p.Y] = Color.Black;
+                            }
+                    }
+                }
         }
 
         private void StructuringElement(string Mode, int size)
@@ -653,28 +702,20 @@ namespace INFOIBV
             label1.Text = "Aantal values: " + valuecounter;
         }
 
-        int[,] edge;
         int tagNr;
 
         private void TagZones()
         {
-            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
             tagNr = 2;
 
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Duplicate the original image
                 for (int y = 0; y < InputImage.Size.Height; y++)
-                    OriginalImage[x, y] = Image[x, y];
-
-            for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
-                for (int y = 0; y < InputImage.Size.Height; y++)
                 {
-                    Color asdf = OriginalImage[x, y];
+                    OriginalImage[x, y] = Image[x, y];
                     if (OriginalImage[x, y] != Color.White && OriginalImage[x, y] != Color.Black)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
-                    if (OriginalImage[x, y].R == 255)
-                        edge[x, y] = 1;                             
-                }
+                }         
 
             for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
                 for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
@@ -801,6 +842,7 @@ namespace INFOIBV
             EdgeDetection("Sobel");
             ContrastAdjustment();
             Thresholding(40);
+            ReduceBinaryNoise();
             TagZones();
 
             pipelineing = false;
