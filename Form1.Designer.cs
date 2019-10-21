@@ -148,6 +148,7 @@
             "Nonlinear filter",
             "Edge detection",
             "Thresholding",
+            "NiblackThresholding",
             "Structuring element",
             "Erosion",
             "Dilation",

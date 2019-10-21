@@ -151,6 +151,9 @@ namespace INFOIBV
                     }
                     Thresholding(threshold);
                     break;
+                case ("NiblackThresholding"):
+                    NiblackThresholding();
+                    break;
                 case ("Erosion"):
                     try
                     {
@@ -491,6 +494,79 @@ namespace INFOIBV
                 }
         }
 
+        private void NiblackThresholding()
+        {
+            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
+
+            // Some Niblack Thresholding variables, default: k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
+            double k = 0.2;
+            int filterradius = 10;
+            int d = 30;
+
+            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            for (int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    OriginalImage[x, y] = Image[x, y];
+                }
+            }
+
+            for (int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    double mean = 0;
+                    double variance = 0;
+                    int counter = 0;
+
+                    for (int i = 0 - filterradius; i <= filterradius; i++)
+                    {
+                        for (int j = 0 - filterradius; j <= filterradius; j++)
+                        {
+                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            {
+                                mean += OriginalImage[x + i, y + j].R;
+                                counter++;
+                            }
+                        }
+                    }
+
+                    mean = mean / counter;
+
+                    for (int i = 0 - filterradius; i <= filterradius; i++)
+                    {
+                        for (int j = 0 - filterradius; j <= filterradius; j++)
+                        {
+                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            {
+                                variance += (OriginalImage[x + i, y + j].R - mean) * (OriginalImage[x + i, y + j].R - mean);
+                            }
+                        }
+                    }
+
+                    variance = variance / counter;
+                    double standarddeviation = Math.Sqrt(variance);
+
+                    int threshold = (int)(mean + k * standarddeviation + d);
+                    if (Image[x, y].R > threshold)
+                    {
+                        Image[x, y] = Color.White;
+                        edge[x, y] = 1;
+                    }
+                    else
+                    {
+                        Image[x, y] = Color.Black;
+                    }
+
+///                    if(!pipelineing)
+///                    {
+///                        progressBar.PerformStep();
+///                    }
+                }
+            }
+        }
+
         private void ReduceBinaryNoise()
         {
             bool[,] covered = new bool[Image.GetLength(0), Image.GetLength(1)];
@@ -713,7 +789,7 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
-                    if (OriginalImage[x, y] != Color.White && OriginalImage[x, y] != Color.Black)
+                    if (OriginalImage[x, y] != Color.FromArgb(255,255,255) && OriginalImage[x, y] != Color.FromArgb(0,0,0) && OriginalImage[x, y] != Color.Black && OriginalImage[x,y] != Color.White)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
                 }         
 
