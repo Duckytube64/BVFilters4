@@ -838,8 +838,7 @@ namespace INFOIBV
                         Image[i, j] = Color.FromArgb(463 * tag % 256, 233 * tag % 256, 337 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }            
         }
-
-        /* Floodfill werkt nu met een 8 neighbourhood, waardoor hij over schuine lijnen kan springen, misschien 4 neighbourhood maken? */
+        
         private void FloodFill(int startx, int starty)
         {
             Stack<Point> zonePoints = new Stack<Point>();
