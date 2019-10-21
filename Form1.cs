@@ -201,6 +201,9 @@ namespace INFOIBV
                 case ("Value counting"):
                     ValueCounting();
                     break;
+                case ("Reduce Binary Noise"):
+                    ReduceBinaryNoise();
+                    break;
                 case ("Tag zones"):
                     TagZones();
                     break;
@@ -498,10 +501,10 @@ namespace INFOIBV
         {
             edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
 
-            // Some Niblack Thresholding variables, default: k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
+            // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
             int filterradius = 10;
-            int d = 30;
+            int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
             for (int x = 0; x < InputImage.Size.Width; x++)
@@ -519,6 +522,7 @@ namespace INFOIBV
                     double mean = 0;
                     double variance = 0;
                     int counter = 0;
+                    int[] histogram = new int[256];
 
                     for (int i = 0 - filterradius; i <= filterradius; i++)
                     {
@@ -526,7 +530,9 @@ namespace INFOIBV
                         {
                             if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
                             {
-                                mean += OriginalImage[x + i, y + j].R;
+                                int value = OriginalImage[x + i, y + j].R;
+                                mean += value;
+                                histogram[value]++;
                                 counter++;
                             }
                         }
@@ -534,14 +540,11 @@ namespace INFOIBV
 
                     mean = mean / counter;
 
-                    for (int i = 0 - filterradius; i <= filterradius; i++)
+                    for (int i = 0; i < 256; i++)
                     {
-                        for (int j = 0 - filterradius; j <= filterradius; j++)
+                        if (histogram[i] != 0)
                         {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
-                            {
-                                variance += (OriginalImage[x + i, y + j].R - mean) * (OriginalImage[x + i, y + j].R - mean);
-                            }
+                            variance += ((i - mean) * (i - mean)) * histogram[i];
                         }
                     }
 
@@ -558,11 +561,6 @@ namespace INFOIBV
                     {
                         Image[x, y] = Color.Black;
                     }
-
-///                    if(!pipelineing)
-///                    {
-///                        progressBar.PerformStep();
-///                    }
                 }
             }
         }
@@ -841,6 +839,7 @@ namespace INFOIBV
                 }            
         }
 
+        /* Floodfill werkt nu met een 8 neighbourhood, waardoor hij over schuine lijnen kan springen, misschien 4 neighbourhood maken? */
         private void FloodFill(int startx, int starty)
         {
             Stack<Point> zonePoints = new Stack<Point>();
@@ -853,6 +852,7 @@ namespace INFOIBV
 
                 edge[x,y] = tagNr;
 
+                /*   /// 8-Neighborhood-way
                 for (int i = -1; i <= 1; i++)
                     for (int j = -1; j <= 1; j++)
                         if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
@@ -862,6 +862,32 @@ namespace INFOIBV
                             else if (edge[x + i, y + j] == 1)
                                 edge[x + i, y + j] = tagNr;
                         }
+                */
+                /// Ugly hardcoded 4-Neighborhood-way
+                int i = 0;
+                int j = 0;
+                for (i = -1; i <= 1; i = i + 2)
+                {
+                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                    {
+                        if (edge[x + i, y + j] == 0)
+                            zonePoints.Push(new Point(x + i, y + j));
+                        else if (edge[x + i, y + j] == 1)
+                            edge[x + i, y + j] = tagNr;
+                    }
+                }
+                i = 0;
+                j = 0;
+                for (j = -1; j <= 1; j = j + 2)
+                {
+                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                    {
+                        if (edge[x + i, y + j] == 0)
+                            zonePoints.Push(new Point(x + i, y + j));
+                        else if (edge[x + i, y + j] == 1)
+                            edge[x + i, y + j] = tagNr;
+                    }
+                }
             }
         }
 
@@ -917,7 +943,8 @@ namespace INFOIBV
             Closing(1);
             EdgeDetection("Sobel");
             ContrastAdjustment();
-            Thresholding(40);
+            NiblackThresholding();
+            //Thresholding(40);
             ReduceBinaryNoise();
             TagZones();
 

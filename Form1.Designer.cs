@@ -155,6 +155,7 @@
             "Opening",
             "Closing",
             "Value counting",
+            "Reduce Binary Noise",
             "Tag zones",
             "Pipeline v0"});
             this.comboBox1.Location = new System.Drawing.Point(1121, 17);
