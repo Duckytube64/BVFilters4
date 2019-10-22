@@ -850,7 +850,7 @@ namespace INFOIBV
                                     tagNeighborhood[edge[x + i, y + j]]++;
                                 
                         for (int k = 0; k < tagNr; k++)                        
-                            if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)
+                            if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
                             {
                                 minTagVal = tagNeighborhood[k];
                                 minTag = k;
