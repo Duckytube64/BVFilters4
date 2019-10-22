@@ -207,8 +207,8 @@ namespace INFOIBV
                 case ("Tag zones"):
                     TagZones();
                     break;
-                case ("Pipeline v0"):
-                    PipelineV0();
+                case ("Pipeline v0_1"):
+                    PipelineV0_1();
                     break;
                 case ("Nothing"):
                 default:
@@ -637,6 +637,39 @@ namespace INFOIBV
                 MessageBox.Show(message, "Structuring element visual", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        private void SetH(int size)
+        {
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException("size has to be greater than 0");
+
+            bool[,] newH = new bool[3, 3];
+            try
+            {
+                newH = new bool[size * 2 - 1, size * 2 - 1];
+            }
+            catch
+            {
+                return;
+            }
+
+            for (int i = 0; i < size * 2 - 1; i++)
+            {
+                for (int j = 0; j < size * 2 - 1; j++)
+                {
+                    if (mode == "Plus")
+                    {
+                        if (i == newH.GetLength(0) / 2 || j == newH.GetLength(1) / 2)
+                            newH[i, j] = true;
+                    }
+                    else if (mode == "Rectangle")
+                    {
+                        newH[i, j] = true;
+                    }
+                }
+            }
+            H = newH;
+        }
+
         private double[,] GetEDFilter(string filterName)
         {
             switch (filterName)
@@ -890,43 +923,63 @@ namespace INFOIBV
             }
         }
 
-        private void SetH(int size)
+        // Checks if one zone surrounds another zone
+        // Usefull for checking if something is a mug:
+        // The handle gap is always surrounded by the mug
+        private List<int>[] CheckIfZonesSurrounded()        // We kunnen nog toevoegen dat het een % uitrekend van welke tags om elke tag heen zitten, en dat met een hoog % een tag nogsteeds een andere omsingeld (vanwege thresholding fouten enzo kunnen er gaten in het handvat van de mok zitten)
         {
-            if (size <= 0)
-                throw new ArgumentOutOfRangeException("size has to be greater than 0");
-
-            bool[,] newH = new bool[3, 3];
-            try
+            List<int>[] hasSurrounded = new List<int>[tagNr + 1];   // Als tagNr = x dan moet je array x + 1 zijn om ze allemaal erin te gooien
+            for (int index = 0; index <= tagNr; index++)
             {
-                newH = new bool[size * 2 - 1, size * 2 - 1];
-            }
-            catch
-            {
-                return;
+                hasSurrounded[index] = new List<int>();
             }
 
-            for (int i = 0; i < size * 2 - 1; i++)
+            bool[] neighbourTagsInit = new bool[tagNr + 1];
+
+            for (int tag = 2; tag <= tagNr; tag++)
             {
-                for (int j = 0; j < size * 2 - 1; j++)
+                CheckTag(tag);          // For each tag#...
+            }
+
+            void CheckTag(int tag)      // Blijkbaar is het in c# mogelijk mini-methodes in methodes te schrijven die local variables delen, wat erg handig is als je meerdere for loops tegelijk wilt breaken (hier met een return)
+            {
+                neighbourTagsInit[tag] = true;
+
+                bool[] neighbourTags = neighbourTagsInit;
+                for (int x = 0; x < InputImage.Size.Width; x++)
+                    for (int y = 0; y < InputImage.Size.Height; y++)
+                        if (edge[x, y] == tag)                              // For every pixel that has tag# tag...
+                        {
+                            int neighbourCount = 0;
+                            for (int i = -1; i <= 1; i++)
+                                for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood...
+                                    if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                                    {
+                                        if (!neighbourTags[edge[x + i, y + j]])     // For the tag# of its surrounding pixels
+                                        {
+                                            neighbourTags[edge[x + i, y + j]] = true;
+                                            neighbourCount++;
+                                        }
+                                        if (neighbourCount > 2)             // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
+                                            return;
+                                    }                                
+                        }
+                for (int k = 0; k <= tagNr; k++)                             // Otherwise, note which tag# is surrounding tag
                 {
-                    if (mode == "Plus")
-                    {
-                        if (i == newH.GetLength(0) / 2 || j == newH.GetLength(1) / 2)
-                            newH[i, j] = true;
-                    }
-                    else if (mode == "Rectangle")
-                    {
-                        newH[i, j] = true;
-                    }
+                    if (neighbourTags[k] && k != tag)
+                        hasSurrounded[k].Add(tag);
                 }
+
+                neighbourTagsInit[tag] = false;
             }
-            H = newH;
+
+            return hasSurrounded;
         }
 
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
-        private void PipelineV0()
+        private void PipelineV0_1()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
@@ -943,9 +996,9 @@ namespace INFOIBV
             EdgeDetection("Sobel");
             ContrastAdjustment();
             NiblackThresholding();
-            //Thresholding(40);
             ReduceBinaryNoise();
             TagZones();
+            CheckIfZonesSurrounded();
 
             pipelineing = false;
         }
