@@ -841,23 +841,21 @@ namespace INFOIBV
                     if (edge[x, y] == 1)
                     {
                         int[] tagNeighborhood = new int[tagNr];
-                        int minTagVal = 8;
-                        int minTag = 1;
+                        int minTagVal = 9;
+                        int minTag = tagNr + 1;
 
-                        for (int i = -1; i <= 1; i++)
+                        for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
                             for (int j = -1; j <= 1; j++)
-                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1) && !(x + i == 0 && y + j == 0))
-                                {
+                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))                                
                                     tagNeighborhood[edge[x + i, y + j]]++;
-                                }
-                        for (int k = 0; k < tagNr; k++)
-                        {
+                                
+                        for (int k = 0; k < tagNr; k++)                        
                             if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)
                             {
                                 minTagVal = tagNeighborhood[k];
                                 minTag = k;
                             }
-                        }
+
                         edge[x, y] = minTag;
                     }
 
@@ -984,13 +982,13 @@ namespace INFOIBV
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            Color[,] OriginalImage = Image, GrayImage;
+            Color[,] OriginalImage = Image, grayImage, tagImage;
 
             pipelineing = true;
 
             Grayscale();
             ContrastAdjustment();
-            GrayImage = Image;
+            grayImage = Image;
             StructuringElement("Rectangle", 2);
             Closing(1);
             EdgeDetection("Sobel");
@@ -998,6 +996,7 @@ namespace INFOIBV
             NiblackThresholding();
             ReduceBinaryNoise();
             TagZones();
+            tagImage = Image;
             CheckIfZonesSurrounded();
 
             pipelineing = false;
