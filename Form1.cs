@@ -819,6 +819,7 @@ namespace INFOIBV
                                 }
                         for (int k = 0; k < tagNr; k++)
                         {
+/// ????                    // Waarom tagNeighborhood[k] kleiner dan minTagval? Je wilt toch dat hij de waarde van de meest voorkomende aanneemt?
                             if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)
                             {
                                 minTagVal = tagNeighborhood[k];
@@ -890,6 +891,41 @@ namespace INFOIBV
             }
         }
 
+        private void findTagzones()
+        {
+            for(int i = 2; i <= tagNr; i++)
+            {
+                for(int x = 0; x < InputImage.Size.Width; x++)
+                {
+                    for(int y = 0; y < InputImage.Size.Height; y++)
+                    {
+                        if(edge[x,y] == i)
+                        {
+                            double[] perimeter = findPerimeter(i, x, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        private double[] findPerimeter(int tag, int x, int y)
+        {
+            bool[,] visited = new bool[InputImage.Size.Width, InputImage.Size.Height];
+            bool backAtStart = false;
+            int perimeter = 0;
+
+            while(!backAtStart)
+            {
+                if (edge[x - 1, y] == tag && !visited[x - 1, y]) // step to the left
+                {
+                    x--;
+                    perimeter++;
+                }
+                else if () ;
+            }
+
+        }
+
         private void SetH(int size)
         {
             if (size <= 0)
@@ -942,8 +978,8 @@ namespace INFOIBV
             Closing(1);
             EdgeDetection("Sobel");
             ContrastAdjustment();
-            NiblackThresholding();
-            //Thresholding(40);
+            //NiblackThresholding();
+            Thresholding(40);
             ReduceBinaryNoise();
             TagZones();
 
