@@ -891,28 +891,49 @@ namespace INFOIBV
             }
         }
 
+        int[] perimeterlist;
+        int[] arealist;
+
         private void findTagzones()
         {
+            perimeterlist = new int[tagNr];
+            arealist = new int[tagNr];
+
             for(int i = 2; i <= tagNr; i++)
             {
                 for(int x = 0; x < InputImage.Size.Width; x++)
                 {
+                    bool breakout = false;
+
                     for(int y = 0; y < InputImage.Size.Height; y++)
                     {
                         if(edge[x,y] == i)
                         {
-                            double[] perimeter = findPerimeter(i, x, y);
+                            int[] perimeter = findPerimeter(i, x, y);
+                            perimeterlist[tagNr] = perimeter[0];
+                            arealist[tagNr] = perimeter[1];
+                            breakout = true;
+                            break;
                         }
+                    }
+
+                    if (breakout)
+                    {
+                        break;
                     }
                 }
             }
         }
 
-        private double[] findPerimeter(int tag, int x, int y)
+        private int[] findPerimeter(int tag, int x, int y)
         {
             bool[,] visited = new bool[InputImage.Size.Width, InputImage.Size.Height];
             bool backAtStart = false;
             int perimeter = 0;
+            int startx = x;
+            int starty = y;
+            int yposition = 0;
+            int area = 0;
 
             while(!backAtStart)
             {
@@ -920,9 +941,46 @@ namespace INFOIBV
                 {
                     x--;
                     perimeter++;
+                    visited[x, y] = true;
+                    area -= yposition;
                 }
-                else if () ;
+                else if (edge[x, y - 1] == tag && !visited[x, y - 1]) // step one down
+                {
+                    y--;
+                    perimeter++;
+                    visited[x, y] = true;
+                    yposition++;
+                }
+                else if (edge[x + 1, y] == tag && !visited[x + 1, y]) // step to the right
+                {
+                    x++;
+                    perimeter++;
+                    visited[x, y] = true;
+                    area += yposition;
+                }
+                else if (edge[x, y + 1] == tag && !visited[x, y + 1]) // step one up
+                {
+                    y++;
+                    perimeter++;
+                    visited[x, y] = true;
+                    yposition--;
+                }
+                else if ((x - 1 == startx && y == starty) || (x + 1 == startx && y == starty) || (x == startx && y - 1 == starty) || (x == startx && y + 1 == starty))
+                {
+                    if (x - 1 == startx) // we went left so increase area
+                    {
+                        area += yposition;
+                    }
+                    if (x + 1 == startx) // we went right so decrease area
+                    {
+                        area -= yposition;
+                    }
+                    perimeter++;
+                    backAtStart = true;
+                }
             }
+
+            return [perimeter, area];
 
         }
 
