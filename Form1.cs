@@ -814,7 +814,7 @@ namespace INFOIBV
         private void TagZones()
         {
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
-            tagNr = 2;
+            tagNr = 1;
 
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Duplicate the original image
                 for (int y = 0; y < InputImage.Size.Height; y++)
@@ -829,18 +829,20 @@ namespace INFOIBV
                 {
                     if (edge[x, y] == 0)
                     {
-                        FloodFill(x, y);
                         tagNr++;
+                        FloodFill(x, y);
                     }
                     if (!pipelineing)
-                        progressBar.PerformStep();    // Increment progress bar
+                        progressBar.PerformStep();                  // Increment progress bar
                 }
 
             for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
                 for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
                     if (edge[x, y] == 1)
                     {
-                        int[] tagNeighborhood = new int[tagNr];
+                        if (x == 15 && y == 0)
+                            x = x;
+                        int[] tagNeighborhood = new int[tagNr + 1];
                         int minTagVal = 9;
                         int minTag = tagNr + 1;
 
@@ -849,13 +851,12 @@ namespace INFOIBV
                                 if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))                                
                                     tagNeighborhood[edge[x + i, y + j]]++;
                                 
-                        for (int k = 0; k < tagNr; k++)                        
+                        for (int k = 2; k <= tagNr; k++)                        
                             if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
                             {
                                 minTagVal = tagNeighborhood[k];
                                 minTag = k;
                             }
-
                         edge[x, y] = minTag;
                     }
 
@@ -866,7 +867,7 @@ namespace INFOIBV
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.FromArgb(463 * tag % 256, 233 * tag % 256, 337 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                        Image[i, j] = Color.FromArgb(0 + tag * 40, 0, 0);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }            
         }
         
@@ -924,7 +925,7 @@ namespace INFOIBV
         int[] perimeterlist;
         int[] arealist;
 
-        private void findTagzones()
+        private void FindTagzones()
         {
             perimeterlist = new int[tagNr];
             arealist = new int[tagNr];
@@ -939,7 +940,7 @@ namespace INFOIBV
                     {
                         if(edge[x,y] == i)
                         {
-                            int[] perimeter = findPerimeter(i, x, y);
+                            int[] perimeter = FindPerimeter(i, x, y);
                             perimeterlist[tagNr] = perimeter[0];
                             arealist[tagNr] = perimeter[1];
                             breakout = true;
@@ -955,7 +956,7 @@ namespace INFOIBV
             }
         }
 
-        private int[] findPerimeter(int tag, int x, int y)
+        private int[] FindPerimeter(int tag, int x, int y)
         {
             bool[,] visited = new bool[InputImage.Size.Width, InputImage.Size.Height];
             bool backAtStart = false;
@@ -1010,8 +1011,10 @@ namespace INFOIBV
                 }
             }
 
-            return [perimeter, area];
-
+            int[] output = new int[2];
+            output[0] = perimeter;
+            output[1] = area;
+            return output;
         }
 
         // Checks if one zone surrounds another zone
@@ -1025,8 +1028,6 @@ namespace INFOIBV
                 hasSurrounded[index] = new List<int>();
             }
 
-            bool[] neighbourTagsInit = new bool[tagNr + 1];
-
             for (int tag = 2; tag <= tagNr; tag++)
             {
                 CheckTag(tag);          // For each tag#...
@@ -1034,39 +1035,31 @@ namespace INFOIBV
 
             void CheckTag(int tag)      // Blijkbaar is het in c# mogelijk mini-methodes in methodes te schrijven die local variables delen, wat erg handig is als je meerdere for loops tegelijk wilt breaken (hier met een return)
             {
-                neighbourTagsInit[tag] = true;
+                int neighbourCount = 0;
+                bool[] neighbourTags = new bool[tagNr + 1];
 
-                bool[] neighbourTags = neighbourTagsInit;
                 for (int x = 0; x < InputImage.Size.Width; x++)
                     for (int y = 0; y < InputImage.Size.Height; y++)
-                        if (edge[x, y] == tag)                              // For every pixel that has tag# tag...
-                        {
-                            int neighbourCount = 0;
+                        if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
                             for (int i = -1; i <= 1; i++)
-                                for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood...
-                                    if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
-                                    {
-                                        if (!neighbourTags[edge[x + i, y + j]])     // For the tag# of its surrounding pixels
+                                for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
+                                    if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)                                    
+                                        if (!neighbourTags[edge[x + i, y + j]])
                                         {
                                             neighbourTags[edge[x + i, y + j]] = true;
                                             neighbourCount++;
-                                        }
-                                        if (neighbourCount > 2)             // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
-                                            return;
-                                    }                                
-                        }
-                for (int k = 0; k <= tagNr; k++)                             // Otherwise, note which tag# is surrounding tag
+                                            if (neighbourCount > 2)         // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
+                                                return;                                            
+                                        }                                    
+                        
+                for (int k = 2; k <= tagNr; k++)                            // Otherwise, note which tag# is surrounding tag
                 {
                     if (neighbourTags[k] && k != tag)
                         hasSurrounded[k].Add(tag);
                 }
-
-                neighbourTagsInit[tag] = false;
             }
-
             return hasSurrounded;
         }
-
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
