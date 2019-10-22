@@ -921,6 +921,41 @@ namespace INFOIBV
             }
         }
 
+        private void findTagzones()
+        {
+            for(int i = 2; i <= tagNr; i++)
+            {
+                for(int x = 0; x < InputImage.Size.Width; x++)
+                {
+                    for(int y = 0; y < InputImage.Size.Height; y++)
+                    {
+                        if(edge[x,y] == i)
+                        {
+                            double[] perimeter = findPerimeter(i, x, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        private double[] findPerimeter(int tag, int x, int y)
+        {
+            bool[,] visited = new bool[InputImage.Size.Width, InputImage.Size.Height];
+            bool backAtStart = false;
+            int perimeter = 0;
+
+            while(!backAtStart)
+            {
+                if (edge[x - 1, y] == tag && !visited[x - 1, y]) // step to the left
+                {
+                    x--;
+                    perimeter++;
+                }
+                else if () ;
+            }
+
+        }
+
         // Checks if one zone surrounds another zone
         // Usefull for checking if something is a mug:
         // The handle gap is always surrounded by the mug
