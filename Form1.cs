@@ -503,7 +503,7 @@ namespace INFOIBV
 
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = 10;
+            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10));       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
@@ -820,9 +820,9 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
-                    if (OriginalImage[x, y] != Color.FromArgb(255,255,255) && OriginalImage[x, y] != Color.FromArgb(0,0,0) && OriginalImage[x, y] != Color.Black && OriginalImage[x,y] != Color.White)
+                    if (OriginalImage[x, y] != Color.FromArgb(255, 255, 255) && OriginalImage[x, y] != Color.FromArgb(0, 0, 0) && OriginalImage[x, y] != Color.Black && OriginalImage[x, y] != Color.White)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
-                }         
+                }
 
             for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
                 for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
@@ -836,29 +836,36 @@ namespace INFOIBV
                         progressBar.PerformStep();                  // Increment progress bar
                 }
 
+            int[] zoneSizes = CountZoneSizes();
+
             for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
                 for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
                     if (edge[x, y] == 1)
                     {
-                        if (x == 15 && y == 0)
-                            x = x;
-                        int[] tagNeighborhood = new int[tagNr + 1];
-                        int minTagVal = 9;
+                        Image[x, y] = Color.Red;
+                        bool[] tagNeighborhood = new bool[tagNr + 1];
+                        int minTagVal = Image.GetLength(0) * Image.GetLength(1) + 1;
                         int minTag = tagNr + 1;
 
-                        for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
-                            for (int j = -1; j <= 1; j++)
-                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))                                
-                                    tagNeighborhood[edge[x + i, y + j]]++;
-                                
-                        for (int k = 2; k <= tagNr; k++)                        
-                            if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                        for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
+                            for (int j = -2; j <= 2; j++)
+                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                                    tagNeighborhood[edge[x + i, y + j]] = true;
+
+                        for (int k = 2; k <= tagNr; k++)
+                            if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
                             {
-                                minTagVal = tagNeighborhood[k];
+                                minTagVal = zoneSizes[k];
                                 minTag = k;
                             }
                         edge[x, y] = minTag;
+                        Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
                     }
+
+            for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
+                for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
+                    if (edge[x, y] == 1)
+                    { }
 
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
@@ -867,8 +874,8 @@ namespace INFOIBV
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.FromArgb(0 + tag * 40, 0, 0);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
-                }            
+                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 551 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                }
         }
         
         private void FloodFill(int startx, int starty)
@@ -883,17 +890,15 @@ namespace INFOIBV
 
                 edge[x,y] = tagNr;
 
-                /*   /// 8-Neighborhood-way
-                for (int i = -1; i <= 1; i++)
-                    for (int j = -1; j <= 1; j++)
-                        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                        {
-                            if (edge[x + i, y + j] == 0)
-                                zonePoints.Push(new Point(x + i, y + j));
-                            else if (edge[x + i, y + j] == 1)
-                                edge[x + i, y + j] = tagNr;
-                        }
-                */
+                /// 8-Neighborhood-way
+                //for (int i = -1; i <= 1; i++)
+                //    for (int j = -1; j <= 1; j++)
+                //        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                //        {
+                //            if (edge[x + i, y + j] == 0)
+                //                zonePoints.Push(new Point(x + i, y + j));
+                //        }
+
                 /// Ugly hardcoded 4-Neighborhood-way
                 int i = 0;
                 int j = 0;
@@ -903,8 +908,6 @@ namespace INFOIBV
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
-                        else if (edge[x + i, y + j] == 1)
-                            edge[x + i, y + j] = tagNr;
                     }
                 }
                 i = 0;
@@ -915,8 +918,6 @@ namespace INFOIBV
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
-                        else if (edge[x + i, y + j] == 1)
-                            edge[x + i, y + j] = tagNr;
                     }
                 }
             }
@@ -924,6 +925,19 @@ namespace INFOIBV
 
         int[] perimeterlist;
         int[] arealist;
+
+        private int[] CountZoneSizes()
+        {
+            int[] zoneSizes = new int[tagNr + 1];
+
+            for (int  tag = 2;  tag <= tagNr;  tag++)            
+                for (int x = 0; x < Image.GetLength(0); x++)
+                    for (int y = 0; y < Image.GetLength(1); y++)
+                        if (edge[x, y] == tag)
+                            zoneSizes[tag]++;            
+
+            return zoneSizes;
+        }
 
         private void FindTagzones()
         {
@@ -1082,9 +1096,11 @@ namespace INFOIBV
             ContrastAdjustment();
             NiblackThresholding();
             ReduceBinaryNoise();
+            Opening(1);
+            NiblackThresholding();
             TagZones();
-            tagImage = Image;
-            CheckIfZonesSurrounded();
+            //tagImage = Image;
+            //CheckIfZonesSurrounded();
 
             pipelineing = false;
         }
