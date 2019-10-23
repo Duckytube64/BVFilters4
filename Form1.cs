@@ -1030,35 +1030,36 @@ namespace INFOIBV
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                CheckTag(tag);          // For each tag#...
+                CheckTag(tag, hasSurrounded);               // For each tag#...
             }
 
-            void CheckTag(int tag)      // Blijkbaar is het in c# mogelijk mini-methodes in methodes te schrijven die local variables delen, wat erg handig is als je meerdere for loops tegelijk wilt breaken (hier met een return)
-            {
-                int neighbourCount = 0;
-                bool[] neighbourTags = new bool[tagNr + 1];
-
-                for (int x = 0; x < InputImage.Size.Width; x++)
-                    for (int y = 0; y < InputImage.Size.Height; y++)
-                        if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
-                            for (int i = -1; i <= 1; i++)
-                                for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
-                                    if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)                                    
-                                        if (!neighbourTags[edge[x + i, y + j]])
-                                        {
-                                            neighbourTags[edge[x + i, y + j]] = true;
-                                            neighbourCount++;
-                                            if (neighbourCount > 2)         // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
-                                                return;                                            
-                                        }                                    
-                        
-                for (int k = 2; k <= tagNr; k++)                            // Otherwise, note which tag# is surrounding tag
-                {
-                    if (neighbourTags[k] && k != tag)
-                        hasSurrounded[k].Add(tag);
-                }
-            }
             return hasSurrounded;
+        }
+
+        void CheckTag(int tag, List<int>[] hasSurrounded)      
+        {
+            int neighbourCount = 0;
+            bool[] neighbourTags = new bool[tagNr + 1];
+
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                    if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
+                        for (int i = -1; i <= 1; i++)
+                            for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
+                                if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                                    if (!neighbourTags[edge[x + i, y + j]])
+                                    {
+                                        neighbourTags[edge[x + i, y + j]] = true;
+                                        neighbourCount++;
+                                        if (neighbourCount > 2)         // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
+                                            return;
+                                    }
+
+            for (int k = 2; k <= tagNr; k++)                            // Otherwise, note which tag# is surrounding tag
+            {
+                if (neighbourTags[k] && k != tag)
+                    hasSurrounded[k].Add(tag);
+            }
         }
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
