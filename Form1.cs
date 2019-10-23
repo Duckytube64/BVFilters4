@@ -862,11 +862,6 @@ namespace INFOIBV
                         Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
                     }
 
-            for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
-                for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
-                    if (edge[x, y] == 1)
-                    { }
-
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
