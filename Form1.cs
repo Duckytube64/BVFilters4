@@ -20,6 +20,9 @@ namespace INFOIBV
         string mode;
         bool[,] H;
         int rounds;
+        bool[,] potentialEdge;
+        int[,] outerBound;
+        List<Point> neighbourPriority = new List<Point>();
 
         public INFOIBV()
         {
@@ -917,7 +920,7 @@ namespace INFOIBV
                 }
             }
         }
-
+        /*
         int[] perimeterlist;
         int[] arealist;
 
@@ -939,7 +942,7 @@ namespace INFOIBV
             perimeterlist = new int[tagNr];
             arealist = new int[tagNr];
 
-            for(int i = 2; i <= tagNr; i++)
+            for(int i = 3; i <= tagNr; i++)
             {
                 for(int x = 0; x < InputImage.Size.Width; x++)
                 {
@@ -964,66 +967,139 @@ namespace INFOIBV
                 }
             }
         }
+        */
 
-        private int[] FindPerimeter(int tag, int x, int y)
+        private void BoundaryTrace(int tag)
         {
-            bool[,] visited = new bool[InputImage.Size.Width, InputImage.Size.Height];
-            bool backAtStart = false;
-            int perimeter = 0;
-            int startx = x;
-            int starty = y;
-            int yposition = 0;
-            int area = 0;
+            // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
+            // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
+            potentialEdge = new bool[InputImage.Size.Width, InputImage.Size.Height]; // Initialize boolian array to keep track of boundary pixels
+            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            bool startFound = false;
+            Point start = Point.Empty;
 
-            while(!backAtStart)
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                    OriginalImage[x, y] = Image[x, y];
+
+            outerBound = new int[InputImage.Size.Width, InputImage.Size.Height];     // Will keep track of the state of boundary pixels in potentialEdge:
+            outerBound[start.X, start.Y] = 0;                                               // 0 = not yet visited/ 1 = visited/ 2 = bridge pixel (connection between shapes of 1 pixel)
+
+            for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    if (OriginalImage[x, y].R == 0 && edge[x,y] == tag)
+                    {
+                        if (!startFound)
+                        {
+                            start = new Point(x, y);
+                            startFound = true;
+                        }
+                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for white pixels                        
+                            for (int j = -1; j <= 1; j++)
+                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && OriginalImage[x + i, y + j].R == 255)
+                                    potentialEdge[x, y] = true;
+                    }
+                    progressBar.PerformStep();                              // Increment progress bar
+                }
+
+            // This sequence of entries creates a priority list for Followbounds to follow when searching neighbours
+            // The sequence is clockwise and chooses direct neighbours first and the diagnal neighbours between them second
+            neighbourPriority.Add(new Point(1, 0));
+            neighbourPriority.Add(new Point(0, 1));
+            neighbourPriority.Add(new Point(1, 1));
+            neighbourPriority.Add(new Point(-1, 0));
+            neighbourPriority.Add(new Point(-1, 1));
+            neighbourPriority.Add(new Point(0, -1));
+            neighbourPriority.Add(new Point(-1, -1));
+            neighbourPriority.Add(new Point(1, -1));
+
+            List<Point> sequence = new List<Point>();
+            sequence.Add(start);
+            bool[,] temp = new bool[InputImage.Size.Width, InputImage.Size.Height];
+            Array.Copy(potentialEdge, temp, potentialEdge.Length);
+            List<Point> tempList = new List<Point>();
+
+            sequence = FollowBound(start, sequence, 1, CountBoundaryLength(start, temp), tempList);
+
+            string message = "The following coordinates are boundarypixels: \n";
+            int counter = 0;
+
+            //for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
+            //    for (int y = 0; y < InputImage.Size.Height; y++)
+            //    {
+            //        Image[x, y] = Color.FromArgb(255, 255, 255);
+            //    }
+
+            foreach (Point p in sequence)
             {
-                if (edge[x - 1, y] == tag && !visited[x - 1, y]) // step to the left
+                counter++;
+                message += "(" + p.X + "," + p.Y + "), ";
+                if (counter % 6 == 0)
+                    message += "\n";
+
+                //Image[p.X, p.Y] = Color.FromArgb(0, 0, 0);
+            }
+            string header = "List of boundarypixels";
+            MessageBoxButtons buttons = MessageBoxButtons.OK;
+            DialogResult result;
+
+            result = MessageBox.Show(message, header, buttons, MessageBoxIcon.Information);
+        }
+
+        private int CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
+        {
+            int count = 0;
+            for (int i = -1; i <= 1; i++)
+                for (int j = -1; j <= 1; j++)
                 {
-                    x--;
-                    perimeter++;
-                    visited[x, y] = true;
-                    area -= yposition;
-                }
-                else if (edge[x, y - 1] == tag && !visited[x, y - 1]) // step one down
-                {
-                    y--;
-                    perimeter++;
-                    visited[x, y] = true;
-                    yposition++;
-                }
-                else if (edge[x + 1, y] == tag && !visited[x + 1, y]) // step to the right
-                {
-                    x++;
-                    perimeter++;
-                    visited[x, y] = true;
-                    area += yposition;
-                }
-                else if (edge[x, y + 1] == tag && !visited[x, y + 1]) // step one up
-                {
-                    y++;
-                    perimeter++;
-                    visited[x, y] = true;
-                    yposition--;
-                }
-                else if ((x - 1 == startx && y == starty) || (x + 1 == startx && y == starty) || (x == startx && y - 1 == starty) || (x == startx && y + 1 == starty))
-                {
-                    if (x - 1 == startx) // we went left so increase area
+                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
                     {
-                        area += yposition;
+                        boundary[start.X + i, start.Y + j] = false;
+                        count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + 1;
                     }
-                    if (x + 1 == startx) // we went right so decrease area
+                }
+            return count;
+        }
+
+        private List<Point> FollowBound(Point p, List<Point> sequence, int currLength, int length, List<Point> backTrackList)   // Use potentialEdge to guide the algorithm along the boundary recursively
+        {
+            Point newP;
+            if (p.IsEmpty)
+                return sequence;
+            if (currLength == length)
+                return sequence;
+
+            foreach (Point neighbour in neighbourPriority)
+            {
+                newP = new Point(p.X + neighbour.X, p.Y + neighbour.Y);
+                if (CheckNeighbour(newP))
+                {
+                    if (backTrackList.Count > 0)
                     {
-                        area -= yposition;
+                        backTrackList.RemoveAt(0);
+                        sequence.AddRange(backTrackList);
+                        backTrackList.Clear();
                     }
-                    perimeter++;
-                    backAtStart = true;
+                    sequence.Add(newP);
+                    return FollowBound(newP, sequence, currLength + 1, length, backTrackList);
                 }
             }
 
-            int[] output = new int[2];
-            output[0] = perimeter;
-            output[1] = area;
-            return output;
+            newP = sequence[sequence.Count - (backTrackList.Count + 1)];
+            backTrackList.Add(newP);
+            return FollowBound(newP, sequence, currLength, length, backTrackList);
+        }
+
+        private bool CheckNeighbour(Point neighbour)
+        {
+            if (neighbour.X >= 0 && neighbour.X < InputImage.Size.Width && neighbour.Y >= 0 && neighbour.Y < InputImage.Size.Height)   // Check if neighbour is within bounds
+                if (potentialEdge[neighbour.X, neighbour.Y] && outerBound[neighbour.X, neighbour.Y] != 1)                              // Check if neighbour is an unvisited boundary pixel
+                {
+                    outerBound[neighbour.X, neighbour.Y] = 1;
+                    return true;
+                }
+            return false;
         }
 
         // Checks if one zone surrounds another zone
@@ -1078,7 +1154,7 @@ namespace INFOIBV
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            Color[,] OriginalImage = Image, grayImage, tagImage;
+            Color[,] OriginalImage = Image, grayImage, tagImage, BinaryImage;
 
             pipelineing = true;
 
@@ -1091,11 +1167,23 @@ namespace INFOIBV
             ContrastAdjustment();
             NiblackThresholding();
             ReduceBinaryNoise();
-            Opening(1);
-            NiblackThresholding();
+            BinaryImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
+            for(int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for(int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    BinaryImage[x, y] = Image[x, y];
+                }
+            }
             TagZones();
-            //tagImage = Image;
-            //CheckIfZonesSurrounded();
+            tagImage = Image;
+            CheckIfZonesSurrounded();
+            Image = BinaryImage;
+            Negative();
+            for (int i = 3; i <= tagNr; i++)
+            {
+                BoundaryTrace(i);
+            }
 
             pipelineing = false;
         }
