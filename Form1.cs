@@ -22,7 +22,8 @@ namespace INFOIBV
         int rounds;
         bool[,] potentialEdge;
         int[,] outerBound;
-     
+        List<Point> neighbourPriority = new List<Point>();
+
         public INFOIBV()
         {
             InitializeComponent();
@@ -139,7 +140,7 @@ namespace INFOIBV
                     GaussianFilter(kernelSize, sigma);
                     break;
                 case ("Edge detection"):
-                    EdgeDetection(comboBox2.Text);
+                    EdgeDetection(comboBox2.Text, true);
                     break;
                 case ("Thresholding"):
                     int threshold;
@@ -415,7 +416,7 @@ namespace INFOIBV
             }
         }
 
-        private void EdgeDetection(string filter)
+        private void EdgeDetection(string filter, bool inColor)
         {
             double normalisationFactor;
             double[,] edgeFilterX = GetEDFilter(filter + "x");
@@ -436,50 +437,68 @@ namespace INFOIBV
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
             for (int x = 0; x < InputImage.Size.Width; x++)
-            {
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
-                }
-            }
+                }            
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
+            for (int x = 0; x < InputImage.Size.Width; x++)            
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     double totalX = 0, totalY = 0;
-                    for (int i = -1; i <= 1; i++)
-                    {
+                    for (int i = -1; i <= 1; i++)                    
                         for (int j = -1; j <= 1; j++)
                         {
                             if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
                             {
-                                totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
-                                totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];
+                                if (!inColor)
+                                {
+                                    totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
+                                    totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];                                    
+                                }
+                                else
+                                {
+                                    totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
+                                    totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];                                
+                                    totalX += OriginalImage[x + i, y + j].G * edgeFilterX[i + 1, j + 1];
+                                    totalY += OriginalImage[x + i, y + j].G * edgeFilterY[i + 1, j + 1];                               
+                                    totalX += OriginalImage[x + i, y + j].B * edgeFilterX[i + 1, j + 1];
+                                    totalY += OriginalImage[x + i, y + j].B * edgeFilterY[i + 1, j + 1];
+                                }
                             }
                             else
                             {
-                                totalX += 255 * edgeFilterX[i + 1, j + 1];
-                                totalY += 255 * edgeFilterY[i + 1, j + 1];
+                                if (!inColor)
+                                {
+                                    totalX += 255 * edgeFilterX[i + 1, j + 1];
+                                    totalY += 255 * edgeFilterY[i + 1, j + 1];
+                                }
+                                else
+                                {
+                                    totalX += 3 * 255 * edgeFilterX[i + 1, j + 1];
+                                    totalY += 3 * 255 * edgeFilterY[i + 1, j + 1];
+                                }
                             }
                             // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                         }
-                    }
                     totalX *= normalisationFactor;
                     totalY *= normalisationFactor;
+                    if (inColor)
+                    {
+                        totalX /= 3;
+                        totalY /= 3;
+                    }
                     double EdgeStrength = Math.Sqrt(totalX * totalX + totalY * totalY);
                     Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
                     if (!pipelineing)
                         progressBar.PerformStep();            // Increment progress bar
-                }
-            }
+                }            
         }
 
         int[,] edge;
 
         private void Thresholding(int threshold)
         {
-            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
             threshold = Math.Max(0, Math.Min(255, threshold));                  // Clamp threshold between 0 and 255         
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
@@ -487,25 +506,21 @@ namespace INFOIBV
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     if (pixelColor.R != pixelColor.G || pixelColor.R != pixelColor.B)
                         throw new ConstraintException("Input image moet grayscale zijn");
-                    if (pixelColor.R > threshold)                           // Set color to black if grayscale (thus either R, G or B) is above threshold, else make the color white
-                    {
-                        Image[x, y] = Color.White;
-                        edge[x, y] = 1;
-                    }
+                    if (pixelColor.R > threshold)                           // Set color to black if grayscale (thus either R, G or B) is above threshold, else make the color white                    
+                        Image[x, y] = Color.White;                    
                     else
                         Image[x, y] = Color.Black;
                     if (!pipelineing)
                         progressBar.PerformStep();            // Increment progress bar
                 }
+            RegisterEdges();
         }
 
         private void NiblackThresholding()
         {
-            edge = new int[InputImage.Size.Width, InputImage.Size.Height];      // Initialize int array to keep track of boundary pixels and their respective tags
-
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = 10;
+            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10));       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
@@ -554,17 +569,13 @@ namespace INFOIBV
                     double standarddeviation = Math.Sqrt(variance);
 
                     int threshold = (int)(mean + k * standarddeviation + d);
-                    if (Image[x, y].R > threshold)
-                    {
-                        Image[x, y] = Color.White;
-                        edge[x, y] = 1;
-                    }
-                    else
-                    {
-                        Image[x, y] = Color.Black;
-                    }
+                    if (Image[x, y].R > threshold)                    
+                        Image[x, y] = Color.White;                    
+                    else                    
+                        Image[x, y] = Color.Black;                    
                 }
             }
+            RegisterEdges();
         }
 
         private void ReduceBinaryNoise()
@@ -822,9 +833,9 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
-                    if (OriginalImage[x, y] != Color.FromArgb(255,255,255) && OriginalImage[x, y] != Color.FromArgb(0,0,0) && OriginalImage[x, y] != Color.Black && OriginalImage[x,y] != Color.White)
+                    if (OriginalImage[x, y] != Color.FromArgb(255, 255, 255) && OriginalImage[x, y] != Color.FromArgb(0, 0, 0) && OriginalImage[x, y] != Color.Black && OriginalImage[x, y] != Color.White)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
-                }         
+                }
 
             for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
                 for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
@@ -838,28 +849,30 @@ namespace INFOIBV
                         progressBar.PerformStep();                  // Increment progress bar
                 }
 
+            int[] zoneSizes = CountZoneSizes();
+
             for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
                 for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
                     if (edge[x, y] == 1)
                     {
-                        if (x == 15 && y == 0)
-                            x = x;
-                        int[] tagNeighborhood = new int[tagNr + 1];
-                        int minTagVal = 9;
+                        Image[x, y] = Color.Red;
+                        bool[] tagNeighborhood = new bool[tagNr + 1];
+                        int minTagVal = Image.GetLength(0) * Image.GetLength(1) + 1;
                         int minTag = tagNr + 1;
 
-                        for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
-                            for (int j = -1; j <= 1; j++)
-                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))                                
-                                    tagNeighborhood[edge[x + i, y + j]]++;
-                                
-                        for (int k = 2; k <= tagNr; k++)                        
-                            if (k > 1 && tagNeighborhood[k] < minTagVal && tagNeighborhood[k] > 0)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                        for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
+                            for (int j = -2; j <= 2; j++)
+                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                                    tagNeighborhood[edge[x + i, y + j]] = true;
+
+                        for (int k = 2; k <= tagNr; k++)
+                            if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
                             {
-                                minTagVal = tagNeighborhood[k];
+                                minTagVal = zoneSizes[k];
                                 minTag = k;
                             }
                         edge[x, y] = minTag;
+                        Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
                     }
 
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
@@ -869,8 +882,8 @@ namespace INFOIBV
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
                     else
-                        Image[i, j] = Color.FromArgb(0 + tag * 40 % 255, 0, 0);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
-                }            
+                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 551 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                }
         }
         
         private void FloodFill(int startx, int starty)
@@ -885,17 +898,15 @@ namespace INFOIBV
 
                 edge[x,y] = tagNr;
 
-                /*   /// 8-Neighborhood-way
-                for (int i = -1; i <= 1; i++)
-                    for (int j = -1; j <= 1; j++)
-                        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                        {
-                            if (edge[x + i, y + j] == 0)
-                                zonePoints.Push(new Point(x + i, y + j));
-                            else if (edge[x + i, y + j] == 1)
-                                edge[x + i, y + j] = tagNr;
-                        }
-                */
+                /// 8-Neighborhood-way
+                //for (int i = -1; i <= 1; i++)
+                //    for (int j = -1; j <= 1; j++)
+                //        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                //        {
+                //            if (edge[x + i, y + j] == 0)
+                //                zonePoints.Push(new Point(x + i, y + j));
+                //        }
+
                 /// Ugly hardcoded 4-Neighborhood-way
                 int i = 0;
                 int j = 0;
@@ -905,8 +916,6 @@ namespace INFOIBV
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
-                        else if (edge[x + i, y + j] == 1)
-                            edge[x + i, y + j] = tagNr;
                     }
                 }
                 i = 0;
@@ -917,13 +926,60 @@ namespace INFOIBV
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
-                        else if (edge[x + i, y + j] == 1)
-                            edge[x + i, y + j] = tagNr;
                     }
                 }
             }
         }
-      
+
+        private int[] CountZoneSizes()
+        {
+            int[] zoneSizes = new int[tagNr + 1];
+
+            for (int  tag = 2;  tag <= tagNr;  tag++)            
+                for (int x = 0; x < Image.GetLength(0); x++)
+                    for (int y = 0; y < Image.GetLength(1); y++)
+                        if (edge[x, y] == tag)
+                            zoneSizes[tag]++;            
+
+            return zoneSizes;
+        }
+
+        /*
+        int[] perimeterlist;
+        int[] arealist;
+
+        private void FindTagzones()
+        {
+            perimeterlist = new int[tagNr];
+            arealist = new int[tagNr];
+
+            for(int i = 3; i <= tagNr; i++)
+            {
+                for(int x = 0; x < InputImage.Size.Width; x++)
+                {
+                    bool breakout = false;
+
+                    for(int y = 0; y < InputImage.Size.Height; y++)
+                    {
+                        if(edge[x,y] == i)
+                        {
+                            int[] perimeter = FindPerimeter(i, x, y);
+                            perimeterlist[tagNr] = perimeter[0];
+                            arealist[tagNr] = perimeter[1];
+                            breakout = true;
+                            break;
+                        }
+                    }
+
+                    if (breakout)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        */
+
         private void BoundaryTrace(int tag)
         {
             // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
@@ -943,58 +999,117 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
-                    if (edge[x, y] == tag)
+                    if (OriginalImage[x, y].R == 0 && edge[x,y] == tag)
                     {
                         if (!startFound)
                         {
                             start = new Point(x, y);
                             startFound = true;
                         }
-                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for black pixels                        
+                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for white pixels                        
                             for (int j = -1; j <= 1; j++)
-                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && edge[x + i, y + j] != tag)
+                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && OriginalImage[x + i, y + j].R == 255)
                                     potentialEdge[x, y] = true;
                     }
-                    if (!pipelineing)
-                    {
-                        progressBar.PerformStep();                              // Increment progress bar
-                    }
+                    progressBar.PerformStep();                              // Increment progress bar
                 }
 
-            if (startFound)
-            {
-                bool[,] temp = new bool[InputImage.Size.Width, InputImage.Size.Height];
-                Array.Copy(potentialEdge, temp, potentialEdge.Length);
+            // This sequence of entries creates a priority list for Followbounds to follow when searching neighbours
+            // The sequence is clockwise and chooses direct neighbours first and the diagnal neighbours between them second
+            neighbourPriority.Add(new Point(1, 0));
+            neighbourPriority.Add(new Point(0, 1));
+            neighbourPriority.Add(new Point(1, 1));
+            neighbourPriority.Add(new Point(-1, 0));
+            neighbourPriority.Add(new Point(-1, 1));
+            neighbourPriority.Add(new Point(0, -1));
+            neighbourPriority.Add(new Point(-1, -1));
+            neighbourPriority.Add(new Point(1, -1));
 
-                double lenght = CountBoundaryLength(start, temp);
-                boundaryLength[tag] = lenght;
+            List<Point> sequence = new List<Point> { start };
+            bool[,] temp = new bool[InputImage.Size.Width, InputImage.Size.Height];
+            Array.Copy(potentialEdge, temp, potentialEdge.Length);
+            List<Point> tempList = new List<Point>();
+
+            sequence = FollowBound(start, sequence, 1, CountBoundaryLength(start, temp), tempList);
+
+            string message = "The following coordinates are boundarypixels: \n";
+            int counter = 0;
+
+            //for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
+            //    for (int y = 0; y < InputImage.Size.Height; y++)
+            //    {
+            //        Image[x, y] = Color.FromArgb(255, 255, 255);
+            //    }
+
+            foreach (Point p in sequence)
+            {
+                counter++;
+                message += "(" + p.X + "," + p.Y + "), ";
+                if (counter % 6 == 0)
+                    message += "\n";
+
+                //Image[p.X, p.Y] = Color.FromArgb(0, 0, 0);
             }
+            string header = "List of boundarypixels";
+            MessageBoxButtons buttons = MessageBoxButtons.OK;
+            DialogResult result;
+
+            result = MessageBox.Show(message, header, buttons, MessageBoxIcon.Information);
         }
 
-        private double CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
+        private int CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
         {
-            double count = 0;
+            int count = 0;
             for (int i = -1; i <= 1; i++)
                 for (int j = -1; j <= 1; j++)
                 {
                     if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
                     {
                         boundary[start.X + i, start.Y + j] = false;
-                        if(i == 0 && j == 0)
-                        {
-                            count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary);
-                        }
-                        else if (i + j == 1 || i + j == -1)                  // If i or j is 0 so we move in a 4 neighborhood-way
-                        {
-                            count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + 1;
-                        }
-                        else
-                        {
-                            count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + Math.Sqrt(2);
-                        }
+                        count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + 1;
                     }
                 }
             return count;
+        }
+
+        private List<Point> FollowBound(Point p, List<Point> sequence, int currLength, int length, List<Point> backTrackList)   // Use potentialEdge to guide the algorithm along the boundary recursively
+        {
+            Point newP;
+            if (p.IsEmpty)
+                return sequence;
+            if (currLength == length)
+                return sequence;
+
+            foreach (Point neighbour in neighbourPriority)
+            {
+                newP = new Point(p.X + neighbour.X, p.Y + neighbour.Y);
+                if (CheckNeighbour(newP))
+                {
+                    if (backTrackList.Count > 0)
+                    {
+                        backTrackList.RemoveAt(0);
+                        sequence.AddRange(backTrackList);
+                        backTrackList.Clear();
+                    }
+                    sequence.Add(newP);
+                    return FollowBound(newP, sequence, currLength + 1, length, backTrackList);
+                }
+            }
+
+            newP = sequence[sequence.Count - (backTrackList.Count + 1)];
+            backTrackList.Add(newP);
+            return FollowBound(newP, sequence, currLength, length, backTrackList);
+        }
+
+        private bool CheckNeighbour(Point neighbour)
+        {
+            if (neighbour.X >= 0 && neighbour.X < InputImage.Size.Width && neighbour.Y >= 0 && neighbour.Y < InputImage.Size.Height)   // Check if neighbour is within bounds
+                if (potentialEdge[neighbour.X, neighbour.Y] && outerBound[neighbour.X, neighbour.Y] != 1)                              // Check if neighbour is an unvisited boundary pixel
+                {
+                    outerBound[neighbour.X, neighbour.Y] = 1;
+                    return true;
+                }
+            return false;
         }
 
         // Checks if one zone surrounds another zone
@@ -1016,7 +1131,7 @@ namespace INFOIBV
             return hasSurrounded;
         }
 
-        void CheckTag(int tag, List<int>[] hasSurrounded)      
+        private void CheckTag(int tag, List<int>[] hasSurrounded)      
         {
             int neighbourCount = 0;
             bool[] neighbourTags = new bool[tagNr + 1];
@@ -1042,6 +1157,34 @@ namespace INFOIBV
             }
         }
 
+        private void Or(Color[,] img1, Color[,] img2)
+        {
+            if (new Point(img1.GetLength(0), img1.GetLength(1)) == new Point(img2.GetLength(0),img2.GetLength(1)))
+                for (int x = 0; x < img1.GetLength(0); x++)                
+                    for (int y = 0; y < img1.GetLength(1); y++)
+                    {
+                        if (img1[x, y].R == 255 || img2[x, y].R == 255)
+                            Image[x, y] = Color.FromArgb(255, 255, 255);
+                        else
+                            Image[x, y] = Color.FromArgb(0, 0, 0);
+                        if (!pipelineing)
+                            progressBar.PerformStep();                          // Increment progress bar
+                    }                
+        }
+
+        private void RegisterEdges()
+        {
+            edge = new int[InputImage.Size.Width, InputImage.Size.Height];
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
+                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
+                    if (Image[x, y].R == 255)
+                        edge[x, y] = 1;
+                }
+        }
+
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
         private void PipelineV0_1()
@@ -1049,45 +1192,52 @@ namespace INFOIBV
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            Color[,] OriginalImage = Image, grayImage, tagImage, BinaryImage;
-
+            Color[,] OriginalImage = new Color[Image.GetLength(0), Image.GetLength(1)], grayImage = new Color[Image.GetLength(0), Image.GetLength(1)],
+                tagImage = new Color[Image.GetLength(0), Image.GetLength(1)], BinaryImage = new Color[Image.GetLength(0), Image.GetLength(1)], 
+                grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)], colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
             pipelineing = true;
 
+            OriginalImage = CopyImage(ref OriginalImage, Image);
             Grayscale();
             ContrastAdjustment();
-            grayImage = Image;
-            StructuringElement("Rectangle", 2);
-            Closing(1);
-            EdgeDetection("Sobel");
-            ContrastAdjustment();
-            //NiblackThresholding();
-            Thresholding(40);
-            ReduceBinaryNoise();
-            BinaryImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
-            for(int x = 0; x < InputImage.Size.Width; x++)
-            {
-                for(int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    BinaryImage[x, y] = Image[x, y];
-                }
-            }
-            TagZones();
-            tagImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
-                for (int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    tagImage[x, y] = Image[x, y];
-                }
-            }
-            CheckIfZonesSurrounded();
-            boundaryLength = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)
-            {
-                BoundaryTrace(i);
-            }
+            grayImage = CopyImage(ref grayImage, Image);
+            GetEdge(false);
+            grayEdge = CopyImage(ref grayEdge, Image);
+            Image = CopyImage(ref Image, OriginalImage);
+            GetEdge(true);
+            colorEdge = CopyImage(ref colorEdge, Image);
+            Or(grayEdge, colorEdge);
+
+            //BinaryImage = CopyImage(ref BinaryImage, Image);
+            //TagZones();
+            //tagImage = Image;
+            //CheckIfZonesSurrounded();
+            //Image = BinaryImage;
+            //Negative();
+            //for (int i = 3; i <= tagNr; i++)
+            //{
+            //    BoundaryTrace(i);
+            //}
 
             pipelineing = false;
+        }
+
+        private void GetEdge(bool colorED)
+        {
+            StructuringElement("Rectangle", 2);
+            Closing(1);
+            EdgeDetection("Sobel", colorED);
+            ContrastAdjustment();
+            NiblackThresholding();
+            ReduceBinaryNoise();
+        }
+
+        private Color[,] CopyImage(ref Color[,] input, Color[,] toCopy)
+        {
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
+                    input[x, y] = toCopy[x, y];
+            return input;
         }
 
         private void saveButton_Click(object sender, EventArgs e)
