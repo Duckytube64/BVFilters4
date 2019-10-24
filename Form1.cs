@@ -1208,10 +1208,10 @@ namespace INFOIBV
             colorEdge = CopyImage(ref colorEdge, Image);
             Or(grayEdge, colorEdge);
 
-            BinaryImage = CopyImage(ref BinaryImage, Image);
-            TagZones();
-            tagImage = Image;
-            CheckIfZonesSurrounded();
+            //BinaryImage = CopyImage(ref BinaryImage, Image);
+            //TagZones();
+            //tagImage = Image;
+            //CheckIfZonesSurrounded();
             //Image = BinaryImage;
             //Negative();
             //for (int i = 3; i <= tagNr; i++)
