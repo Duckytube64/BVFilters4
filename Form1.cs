@@ -23,6 +23,7 @@ namespace INFOIBV
         bool[,] potentialEdge;
         int[,] outerBound;
         List<Point> neighbourPriority = new List<Point>();
+        List<int> areaCounter = new List<int>();
 
         public INFOIBV()
         {
@@ -520,7 +521,7 @@ namespace INFOIBV
         {
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10));       // Depending on the image size, take a filterradius between 2 and 10
+            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10)) + 4;       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
@@ -872,6 +873,7 @@ namespace INFOIBV
                                 minTag = k;
                             }
                         edge[x, y] = minTag;
+                        areaCounter[minTag]++;
                         Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
                     }
 
@@ -897,6 +899,11 @@ namespace INFOIBV
                 int x = currPos.X, y = currPos.Y;
 
                 edge[x,y] = tagNr;
+                while (areaCounter.Count <= tagNr)
+                {
+                    areaCounter.Add(0);
+                }
+                areaCounter[tagNr]++;
 
                 /// 8-Neighborhood-way
                 //for (int i = -1; i <= 1; i++)
@@ -1208,16 +1215,10 @@ namespace INFOIBV
             colorEdge = CopyImage(ref colorEdge, Image);
             Or(grayEdge, colorEdge);
 
-            //BinaryImage = CopyImage(ref BinaryImage, Image);
-            //TagZones();
-            //tagImage = Image;
-            //CheckIfZonesSurrounded();
-            //Image = BinaryImage;
-            //Negative();
-            //for (int i = 3; i <= tagNr; i++)
-            //{
-            //    BoundaryTrace(i);
-            //}
+            BinaryImage = CopyImage(ref BinaryImage, Image);
+            TagZones();
+            CheckIfZonesSurrounded();
+            
 
             pipelineing = false;
         }
