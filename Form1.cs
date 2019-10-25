@@ -20,8 +20,9 @@ namespace INFOIBV
         string mode;
         bool[,] H;
         int rounds;
+        int[] zonesizes;
         bool[,] potentialEdge;
-        int[] perimeterCounter;
+        double[] perimeterCounter;
         double[] compactness;
         double[] circularity;
 
@@ -906,11 +907,13 @@ namespace INFOIBV
                             edge[i, j] = newEdge[i, j];
             }
 
+            CountZoneSizes();
+
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
-                    if (newEdge[i, j] > 1)
-                        edge[i, j] = newEdge[i, j];
+                    //if (newEdge[i, j] > 1)
+                    //    edge[i, j] = newEdge[i, j];
                     int tag = edge[i, j];
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
@@ -959,13 +962,15 @@ namespace INFOIBV
 
         private int[] CountZoneSizes()
         {
-            int[] zoneSizes = new int[tagNr + 1];
-
-            for (int  tag = 2;  tag <= tagNr;  tag++)            
-                for (int x = 0; x < Image.GetLength(0); x++)
-                    for (int y = 0; y < Image.GetLength(1); y++)
-                        if (edge[x, y] == tag)
-                            zoneSizes[tag]++;            
+            zoneSizes = new int[tagNr + 1];
+            
+            for (int x = 0; x < Image.GetLength(0); x++)
+            {
+                for (int y = 0; y < Image.GetLength(1); y++)
+                {
+                    zoneSizes[edge[x, y]]++;
+                }
+            }  
 
             return zoneSizes;
         }
@@ -1004,15 +1009,31 @@ namespace INFOIBV
                     }
                 }
            
-            int perimeter = CountBoundaryLength(start, potentialEdge);
+            double perimeter = CountBoundaryLength(start, potentialEdge);
             perimeterCounter[tag] = perimeter;
                        
         }
 
-        private int CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
+        private double CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
         {
-            int count = 0;
+            double count = 0;
+            boundary[start.X, start.Y] = false;
             for (int i = -1; i <= 1; i++)
+            {
+                for (int j = -1; j <= 1; j++)
+                {
+                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
+                    {
+                        if (i != 0 && j != 0)
+                        {
+                            boundary[start.X + i, start.Y + j] = false;
+                            count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + Math.Sqrt(2);
+                        }
+                    }
+                }
+            }
+            for (int i = -1; i <= 1; i++)
+            {
                 for (int j = -1; j <= 1; j++)
                 {
                     if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
@@ -1024,6 +1045,8 @@ namespace INFOIBV
                         }
                     }
                 }
+            }
+
             return count;
         }
 
@@ -1099,8 +1122,8 @@ namespace INFOIBV
         private void CompactnessAndCircularity(int tag)
         {
             double perimeterSquared = Math.Pow(perimeterCounter[tag], 2);
-            compactness[tag] = areaCounter[tag] / perimeterSquared;
-            circularity[tag] = 4 * Math.PI * (areaCounter[tag] / perimeterSquared);
+            compactness[tag] = zoneSizes[tag] / perimeterSquared;
+            circularity[tag] = 4 * Math.PI * (zoneSizes[tag] / perimeterSquared);
         }
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
@@ -1131,7 +1154,7 @@ namespace INFOIBV
             RegisterEdges();
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            perimeterCounter = new int[tagNr + 1];
+            perimeterCounter = new double[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
                 BoundaryTrace(i);
