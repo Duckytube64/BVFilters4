@@ -1124,45 +1124,60 @@ namespace INFOIBV
         // if we have a mug, as the hole in the handle lowers the density significantly
         private float[,] BBDensityCompare()
         {
-            //KAPUT
             float[,] zoneDensities = new float[tagNr + 1, 2];
-            //int minX = 512, minY = 512, maxX = 0, maxY = 0;
 
-            //for (int tag = 2; tag <= tagNr; tag++)
-            //{
-            //    for (int x = 0; x < Image.GetLength(0); x++)
-            //        for (int y = 0; y < Image.GetLength(1); y++)
-            //            if (edge[x, y] == tag)
-            //            {
-            //                if (x < minX)
-            //                    minX = x;
-            //                if (x > maxX)
-            //                    maxX = x;
-            //                if (y < minY)
-            //                    minY = y;
-            //                if (y > maxY)
-            //                    maxY = y;
-            //            }
+            for (int tag = 2; tag <= tagNr; tag++)
+            {
+                if (zoneSizes[tag] < Image.GetLength(0) * Image.GetLength(1) / 100 * 3)
+                    continue;
+                int minX = 512, minY = 512, maxX = 0, maxY = 0;
+                for (int x = 0; x < Image.GetLength(0); x++)
+                    for (int y = 0; y < Image.GetLength(1); y++)
+                        if (edge[x, y] == tag)
+                        {
+                            if (x < minX)
+                                minX = x;
+                            if (x > maxX)
+                                maxX = x;
+                            if (y < minY)
+                                minY = y;
+                            if (y > maxY)
+                                maxY = y;
+                        }
 
-            //    float boxSize = (maxX - minX) / 2 * (maxY - minY);
-            //    float count1 = 0, count2 = 0;
+                float boxSize = (maxX - minX) / 2 * (maxY - minY);
+                float count1 = 0, count2 = 0, count3 = 0, count4 = 0, density1, density2, density3, density4;
 
-            //    for (int x = minX; x < minX + (maxX - minX) / 2; x++)       // Count left BB
-            //        for (int y = minY; y < maxY; y++)
-            //            if (edge[x, y] == tag)
-            //                count1++;
-            //    zoneDensities[tag, 0] = count1 / boxSize;
+                for (int x = minX; x < minX + (maxX - minX) / 2; x++)       // Count left half of BB
+                    for (int y = minY; y < maxY; y++)
+                        if (edge[x, y] == tag)
+                            count1++;
+                density1 = count1 / boxSize;
 
-            //    for (int x = minX + (maxX - minX) / 2; x <= maxX; x++)      // Count right BB
-            //        for (int y = minY; y < maxY; y++)
-            //            if (edge[x, y] == tag)
-            //                count2++;
-            //    zoneDensities[tag, 1] = count2 / boxSize;
-            //}
+                for (int x = minX + (maxX - minX) / 2; x <= maxX; x++)      // Count right half of BB
+                    for (int y = minY; y < maxY; y++)
+                        if (edge[x, y] == tag)
+                            count2++;
+                density2 = count2 / boxSize;
+
+                for (int x = minX; x <= maxX; x++)                          // Count upper half of BB
+                    for (int y = minY; y < minY + (maxY - minY) / 2; y++)
+                        if (edge[x, y] == tag)
+                            count3++;
+                density3 = count3 / boxSize;
+
+                for (int x = minX; x <= maxX; x++)                          // Count lower half of BB
+                    for (int y = minY + (maxY - minY) / 2; y < maxY; y++)
+                        if (edge[x, y] == tag)
+                            count4++;
+                density4 = count4 / boxSize;
+
+                zoneDensities[tag, 0] = Math.Max(density1, density2) / Math.Min(density1, density2);
+            }
             return zoneDensities;
         }
 
-        private void GradeMug(double[] roundness, double[] compactness,/* double[,] zoneDensities,*/ List<int>[] hasSurrounded)
+        private void GradeMug(double[] roundness, double[] compactness, float[,] zoneDensities, List<int>[] hasSurrounded)
         {
             int[] grades = new int[tagNr + 1];
             List<int> mugs = new List<int>();
@@ -1173,14 +1188,17 @@ namespace INFOIBV
                     grades[tag]++;
                 if (compactness[tag] > 0.04 && compactness[tag] < 0.06)
                     grades[tag]++;
-                //  if (Math.Max(zoneDensities[tag, 0], zoneDensities[tag, 1]) >= Math.Min(zoneDensities[tag, 0], zoneDensities[tag, 1] * 1.2))
-                //      grades[tag]++;
+                if (zoneDensities[tag, 0] > 1.5 && zoneDensities[tag, 0] < 1.8)
+                    grades[tag]++;
+                else if (zoneDensities[tag, 0] >= 1.8)
+                    grades[tag]--;
+                if (zoneDensities[tag, 1] > 0.8 && zoneDensities[tag, 1] < 1.2)
+                    grades[tag]++;
+                else if (zoneDensities[tag, 1] >= 1.2)
+                    grades[tag]--;
                 if (hasSurrounded[tag].Any())
-                {
-                    if (hasSurrounded[tag][0] != 0)
-                        grades[tag] += 2;
-                }
-                if (grades[tag] >= 3)
+                    grades[tag] += 2;
+                if (grades[tag] >= 4)
                     mugs.Add(tag);
             }
 
@@ -1193,8 +1211,6 @@ namespace INFOIBV
             }
         }
 
-        // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
-        // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
         private void PipelineV0_2()
         {
             // Every method increases the progress bar as if it were the only method changing it
@@ -1235,7 +1251,7 @@ namespace INFOIBV
                 CompactnessAndCircularity(i);
             }
             CopyImage(ref Image, OriginalImage);
-            GradeMug(circularity, compactness, hasSurrounded);         
+            GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
             pipelineing = false;
         }
