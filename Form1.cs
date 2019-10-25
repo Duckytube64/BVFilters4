@@ -211,7 +211,7 @@ namespace INFOIBV
                 case ("Tag zones"):
                     TagZones();
                     break;
-                case ("Pipeline v0_1"):
+                case ("Pipeline v0_2"):
                     PipelineV0_2();
                     break;
                 case ("Nothing"):
