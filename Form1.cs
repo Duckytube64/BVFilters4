@@ -21,7 +21,6 @@ namespace INFOIBV
         bool[,] H;
         int rounds;
         bool[,] potentialEdge;
-        int[] areaCounter;
         int[] perimeterCounter;
 
         public INFOIBV()
@@ -824,6 +823,7 @@ namespace INFOIBV
         }
 
         int tagNr;
+        int[] zoneSizes;
 
         private void TagZones()
         {
@@ -850,9 +850,10 @@ namespace INFOIBV
                         progressBar.PerformStep();                  // Increment progress bar
                 }
 
-            int[] zoneSizes = CountZoneSizes();
+            zoneSizes = CountZoneSizes();
             int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
             bool pixelsDistributed = false;
+            double maxDistSqd = 255 * 255 * 3;
 
             while (!pixelsDistributed)
             {
@@ -867,23 +868,21 @@ namespace INFOIBV
                             int minTag = tagNr + 1;
                             int ceilingTag = tagNr + 1;
 
-                            for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
-                                for (int j = -2; j <= 2; j++)
+                            for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
+                                for (int j = -1; j <= 1; j++)
                                     if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
                                         tagNeighborhood[edge[x + i, y + j]] = true;
 
-                            for (int k = 2; k <= tagNr; k++)
-                                if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                            for (int k = 2; k <= tagNr; k++)            // Find the tag with the smallest size, these tend to be foreground
+                                if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)
                                 {
                                     minTagVal = zoneSizes[k];
                                     minTag = k;
                                 }
-                            if (minTag < ceilingTag)
-                            {
-                                newEdge[x, y] = minTag;
-                            }
-                            //else
-                            //    pixelsDistributed = false;
+                            if (minTag < ceilingTag)                            
+                                newEdge[x, y] = minTag;                            
+                            else
+                                pixelsDistributed = false;
                         }
                 for (int i = 0; i < edge.GetLength(0); i++)
                     for (int j = 0; j < edge.GetLength(1); j++)
@@ -1110,12 +1109,7 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            areaCounter = new int[tagNr + 1];
-            for(int x = 0; x < InputImage.Size.Width; x++)            
-                for(int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    areaCounter[edge[x, y]]++;
-                }            
+            //areaCounter = new int[tagNr + 1];                         <-- deze berekenen we al in TagZones, heet zoneSizes
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
@@ -1124,7 +1118,7 @@ namespace INFOIBV
             CheckIfZonesSurrounded();
             //CompactnessAndCircularity();
 
-            //pipelineing = false;
+            pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
