@@ -950,42 +950,7 @@ namespace INFOIBV
 
             return zoneSizes;
         }
-
-        /*
-        int[] perimeterlist;
-        int[] arealist;
-
-        private void FindTagzones()
-        {
-            perimeterlist = new int[tagNr];
-            arealist = new int[tagNr];
-
-            for(int i = 3; i <= tagNr; i++)
-            {
-                for(int x = 0; x < InputImage.Size.Width; x++)
-                {
-                    bool breakout = false;
-
-                    for(int y = 0; y < InputImage.Size.Height; y++)
-                    {
-                        if(edge[x,y] == i)
-                        {
-                            int[] perimeter = FindPerimeter(i, x, y);
-                            perimeterlist[tagNr] = perimeter[0];
-                            arealist[tagNr] = perimeter[1];
-                            breakout = true;
-                            break;
-                        }
-                    }
-
-                    if (breakout)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-        */
+        
 
         private void BoundaryTrace(int tag)
         {
@@ -999,10 +964,7 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                     OriginalImage[x, y] = Image[x, y];
-
-            outerBound = new int[InputImage.Size.Width, InputImage.Size.Height];     // Will keep track of the state of boundary pixels in potentialEdge:
-            outerBound[start.X, start.Y] = 0;                                               // 0 = not yet visited/ 1 = visited/ 2 = bridge pixel (connection between shapes of 1 pixel)
-
+           
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
@@ -1020,48 +982,10 @@ namespace INFOIBV
                     }
                     progressBar.PerformStep();                              // Increment progress bar
                 }
-
-            // This sequence of entries creates a priority list for Followbounds to follow when searching neighbours
-            // The sequence is clockwise and chooses direct neighbours first and the diagnal neighbours between them second
-            neighbourPriority.Add(new Point(1, 0));
-            neighbourPriority.Add(new Point(0, 1));
-            neighbourPriority.Add(new Point(1, 1));
-            neighbourPriority.Add(new Point(-1, 0));
-            neighbourPriority.Add(new Point(-1, 1));
-            neighbourPriority.Add(new Point(0, -1));
-            neighbourPriority.Add(new Point(-1, -1));
-            neighbourPriority.Add(new Point(1, -1));
-
-            List<Point> sequence = new List<Point> { start };
+           
             bool[,] temp = new bool[InputImage.Size.Width, InputImage.Size.Height];
-            Array.Copy(potentialEdge, temp, potentialEdge.Length);
-            List<Point> tempList = new List<Point>();
-
-            sequence = FollowBound(start, sequence, 1, CountBoundaryLength(start, temp), tempList);
-
-            string message = "The following coordinates are boundarypixels: \n";
-            int counter = 0;
-
-            //for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
-            //    for (int y = 0; y < InputImage.Size.Height; y++)
-            //    {
-            //        Image[x, y] = Color.FromArgb(255, 255, 255);
-            //    }
-
-            foreach (Point p in sequence)
-            {
-                counter++;
-                message += "(" + p.X + "," + p.Y + "), ";
-                if (counter % 6 == 0)
-                    message += "\n";
-
-                //Image[p.X, p.Y] = Color.FromArgb(0, 0, 0);
-            }
-            string header = "List of boundarypixels";
-            MessageBoxButtons buttons = MessageBoxButtons.OK;
-            DialogResult result;
-
-            result = MessageBox.Show(message, header, buttons, MessageBoxIcon.Information);
+            CountBoundaryLength(start, temp);
+                       
         }
 
         private int CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
@@ -1077,46 +1001,6 @@ namespace INFOIBV
                     }
                 }
             return count;
-        }
-
-        private List<Point> FollowBound(Point p, List<Point> sequence, int currLength, int length, List<Point> backTrackList)   // Use potentialEdge to guide the algorithm along the boundary recursively
-        {
-            Point newP;
-            if (p.IsEmpty)
-                return sequence;
-            if (currLength == length)
-                return sequence;
-
-            foreach (Point neighbour in neighbourPriority)
-            {
-                newP = new Point(p.X + neighbour.X, p.Y + neighbour.Y);
-                if (CheckNeighbour(newP))
-                {
-                    if (backTrackList.Count > 0)
-                    {
-                        backTrackList.RemoveAt(0);
-                        sequence.AddRange(backTrackList);
-                        backTrackList.Clear();
-                    }
-                    sequence.Add(newP);
-                    return FollowBound(newP, sequence, currLength + 1, length, backTrackList);
-                }
-            }
-
-            newP = sequence[sequence.Count - (backTrackList.Count + 1)];
-            backTrackList.Add(newP);
-            return FollowBound(newP, sequence, currLength, length, backTrackList);
-        }
-
-        private bool CheckNeighbour(Point neighbour)
-        {
-            if (neighbour.X >= 0 && neighbour.X < InputImage.Size.Width && neighbour.Y >= 0 && neighbour.Y < InputImage.Size.Height)   // Check if neighbour is within bounds
-                if (potentialEdge[neighbour.X, neighbour.Y] && outerBound[neighbour.X, neighbour.Y] != 1)                              // Check if neighbour is an unvisited boundary pixel
-                {
-                    outerBound[neighbour.X, neighbour.Y] = 1;
-                    return true;
-                }
-            return false;
         }
 
         // Checks if one zone surrounds another zone
