@@ -423,7 +423,7 @@ namespace INFOIBV
             double normalisationFactor;
             double[,] edgeFilterX = GetEDFilter(filter + "x");
             double[,] edgeFilterY = GetEDFilter(filter + "y");
-
+            
             switch (filter)
             {
                 case ("Prewitt"):
@@ -448,6 +448,7 @@ namespace INFOIBV
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     double totalX = 0, totalY = 0;
+                    double totalRX = 0, totalRY = 0, totalGX = 0, totalGY = 0, totalBX = 0, totalBY = 0;
                     for (int i = -1; i <= 1; i++)                    
                         for (int j = -1; j <= 1; j++)
                         {
@@ -459,13 +460,13 @@ namespace INFOIBV
                                     totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];                                    
                                 }
                                 else
-                                {
-                                    totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
-                                    totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];                                
-                                    totalX += OriginalImage[x + i, y + j].G * edgeFilterX[i + 1, j + 1];
-                                    totalY += OriginalImage[x + i, y + j].G * edgeFilterY[i + 1, j + 1];                               
-                                    totalX += OriginalImage[x + i, y + j].B * edgeFilterX[i + 1, j + 1];
-                                    totalY += OriginalImage[x + i, y + j].B * edgeFilterY[i + 1, j + 1];
+                                {                                                                     
+                                    totalRX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
+                                    totalRY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];
+                                    totalGX += OriginalImage[x + i, y + j].G * edgeFilterX[i + 1, j + 1];
+                                    totalGY += OriginalImage[x + i, y + j].G * edgeFilterY[i + 1, j + 1];
+                                    totalBX += OriginalImage[x + i, y + j].B * edgeFilterX[i + 1, j + 1];
+                                    totalBY += OriginalImage[x + i, y + j].B * edgeFilterY[i + 1, j + 1];
                                 }
                             }
                             else
@@ -477,26 +478,40 @@ namespace INFOIBV
                                 }
                                 else
                                 {
-                                    totalX += 3 * 255 * edgeFilterX[i + 1, j + 1];
-                                    totalY += 3 * 255 * edgeFilterY[i + 1, j + 1];
+                                    totalRX += 255 * edgeFilterX[i + 1, j + 1];
+                                    totalRY += 255 * edgeFilterY[i + 1, j + 1];
+                                    totalGX += 255 * edgeFilterX[i + 1, j + 1];
+                                    totalGY += 255 * edgeFilterY[i + 1, j + 1];
+                                    totalBX += 255 * edgeFilterX[i + 1, j + 1];
+                                    totalBY += 255 * edgeFilterY[i + 1, j + 1];
                                 }
                             }
                             // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                         }
-                    totalX *= normalisationFactor;
-                    totalY *= normalisationFactor;
-                    if (inColor)
+                    if (!inColor)
                     {
-                        totalX /= 3;
-                        totalY /= 3;
+                        totalX *= normalisationFactor;
+                        totalY *= normalisationFactor;
+                        double EdgeStrength = Math.Sqrt(totalX * totalX + totalY * totalY);
+                        Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
+                        if (!pipelineing)
+                            progressBar.PerformStep();            // Increment progress bar
                     }
-                    double EdgeStrength = Math.Sqrt(totalX * totalX + totalY * totalY);
-                    Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
-                    if (!pipelineing)
-                        progressBar.PerformStep();            // Increment progress bar
+                    else
+                    {
+                        totalRX *= normalisationFactor;
+                        totalRY *= normalisationFactor;
+                        totalGX *= normalisationFactor;
+                        totalGY *= normalisationFactor;
+                        totalBX *= normalisationFactor;
+                        totalBY *= normalisationFactor;
+                        double EdgeStrength = Math.Sqrt(totalRX * totalRX + totalRY * totalRY + totalGX * totalGX + totalGY * totalGY + totalBX * totalBX + totalBY * totalBY);
+                        Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
+
+                    }
                 }            
         }
-
+        
         int[,] edge;
 
         private void Thresholding(int threshold)
@@ -522,7 +537,7 @@ namespace INFOIBV
         {
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10)) + 4;       // Depending on the image size, take a filterradius between 2 and 10
+            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10));       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
@@ -1085,7 +1100,7 @@ namespace INFOIBV
 
         private void CompactnessAndCircularity(int tag)
         {
-            double perimeterSquared = Math.Sqrt(perimeterCounter[tag]);
+            double perimeterSquared = Math.Pow(perimeterCounter[tag], 2);
             compactness[tag] = areaCounter[tag] / perimeterSquared;
             circularity[tag] = 4 * Math.PI * (areaCounter[tag] / perimeterSquared);
         }
@@ -1111,19 +1126,19 @@ namespace INFOIBV
             CopyImage(ref Image, OriginalImage);
             GetEdge(true);
             CopyImage(ref colorEdge, Image);
+
             Or(grayEdge, colorEdge);
             NiblackThresholding();
             ReduceBinaryNoise();
             RegisterEdges();
-
             CopyImage(ref BinaryImage, Image);
             TagZones();
             areaCounter = new int[tagNr + 1];
-            for(int x = 0; x < InputImage.Size.Width; x++)            
-                for(int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int y = 0; y < InputImage.Size.Height; y++)
                 {
                     areaCounter[edge[x, y]]++;
-                }            
+                }
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
@@ -1136,7 +1151,7 @@ namespace INFOIBV
             {
                 CompactnessAndCircularity(i);
             }
-            
+
 
             pipelineing = false;
         }
