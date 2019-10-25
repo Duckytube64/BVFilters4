@@ -21,7 +21,6 @@ namespace INFOIBV
         bool[,] H;
         int rounds;
         bool[,] potentialEdge;
-        int[] areaCounter;
         int[] perimeterCounter;
         double[] compactness;
         double[] circularity;
@@ -212,8 +211,8 @@ namespace INFOIBV
                 case ("Tag zones"):
                     TagZones();
                     break;
-                case ("Pipeline v0_1"):
-                    PipelineV0_1();
+                case ("Pipeline v0_2"):
+                    PipelineV0_2();
                     break;
                 case ("Nothing"):
                 default:
@@ -841,6 +840,7 @@ namespace INFOIBV
         }
 
         int tagNr;
+        int[] zoneSizes;
 
         private void TagZones()
         {
@@ -867,7 +867,7 @@ namespace INFOIBV
                         progressBar.PerformStep();                  // Increment progress bar
                 }
 
-            int[] zoneSizes = CountZoneSizes();
+            zoneSizes = CountZoneSizes();
             int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
             bool pixelsDistributed = false;
 
@@ -884,23 +884,21 @@ namespace INFOIBV
                             int minTag = tagNr + 1;
                             int ceilingTag = tagNr + 1;
 
-                            for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
-                                for (int j = -2; j <= 2; j++)
+                            for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
+                                for (int j = -1; j <= 1; j++)
                                     if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
                                         tagNeighborhood[edge[x + i, y + j]] = true;
 
-                            for (int k = 2; k <= tagNr; k++)
-                                if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                            for (int k = 2; k <= tagNr; k++)            // Find the tag with the smallest size, these tend to be foreground
+                                if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)
                                 {
                                     minTagVal = zoneSizes[k];
                                     minTag = k;
                                 }
-                            if (minTag < ceilingTag)
-                            {
-                                newEdge[x, y] = minTag;
-                            }
-                            //else
-                            //    pixelsDistributed = false;
+                            if (minTag < ceilingTag)                            
+                                newEdge[x, y] = minTag;                            
+                            else
+                                pixelsDistributed = false;
                         }
                 for (int i = 0; i < edge.GetLength(0); i++)
                     for (int j = 0; j < edge.GetLength(1); j++)
@@ -1107,7 +1105,7 @@ namespace INFOIBV
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
-        private void PipelineV0_1()
+        private void PipelineV0_2()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
@@ -1133,12 +1131,6 @@ namespace INFOIBV
             RegisterEdges();
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            areaCounter = new int[tagNr + 1];
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    areaCounter[edge[x, y]]++;
-                }
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
