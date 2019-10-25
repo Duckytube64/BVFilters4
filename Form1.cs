@@ -21,9 +21,8 @@ namespace INFOIBV
         bool[,] H;
         int rounds;
         bool[,] potentialEdge;
-        int[,] outerBound;
-        List<Point> neighbourPriority = new List<Point>();
-        List<int> areaCounter = new List<int>();
+        List<int> areaCounter;
+        int[] perimeterCounter;
 
         public INFOIBV()
         {
@@ -974,27 +973,30 @@ namespace INFOIBV
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                     OriginalImage[x, y] = Image[x, y];
-           
+
             for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
                 for (int y = 0; y < InputImage.Size.Height; y++)
                 {
-                    if (OriginalImage[x, y].R == 0 && edge[x,y] == tag)
+                    if (edge[x, y] == tag)
                     {
                         if (!startFound)
                         {
                             start = new Point(x, y);
                             startFound = true;
                         }
-                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for white pixels                        
+                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for pixels with another tag                        
                             for (int j = -1; j <= 1; j++)
-                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && OriginalImage[x + i, y + j].R == 255)
+                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && edge[x + i, y + j] != tag)
                                     potentialEdge[x, y] = true;
                     }
-                    progressBar.PerformStep();                              // Increment progress bar
+                    if (!pipelineing)
+                    {
+                        progressBar.PerformStep();                              // Increment progress bar
+                    }
                 }
            
-            bool[,] temp = new bool[InputImage.Size.Width, InputImage.Size.Height];
-            CountBoundaryLength(start, temp);
+            int perimeter = CountBoundaryLength(start, potentialEdge);
+            perimeterCounter[tag] = perimeter;
                        
         }
 
@@ -1006,8 +1008,11 @@ namespace INFOIBV
                 {
                     if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
                     {
-                        boundary[start.X + i, start.Y + j] = false;
-                        count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + 1;
+                        if (i == 0 || j == 0)
+                        {
+                            boundary[start.X + i, start.Y + j] = false;
+                            count += CountBoundaryLength(new Point(start.X + i, start.Y + j), boundary) + 1;
+                        }
                     }
                 }
             return count;
@@ -1082,6 +1087,7 @@ namespace INFOIBV
                 }
         }
 
+
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
         private void PipelineV0_1()
@@ -1110,7 +1116,25 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            //CheckIfZonesSurrounded();            
+            areaCounter = new List<int>();
+            for(int i = 0; i <= tagNr; i++)
+            {
+                areaCounter.Add(0);
+            }
+            for(int x = 0; x < InputImage.Size.Width; x++)
+            {
+                for(int y = 0; y < InputImage.Size.Height; y++)
+                {
+                    areaCounter[edge[x, y]]++;
+                }
+            }
+            perimeterCounter = new int[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)
+            {
+                BoundaryTrace(i);
+            }
+            CheckIfZonesSurrounded();
+            //CompactnessAndCircularity();
 
             //pipelineing = false;
         }
