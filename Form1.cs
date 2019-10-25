@@ -191,7 +191,7 @@ namespace INFOIBV
                     }
                     Opening(rounds);
                     break;
-                case ("Closing"):       // Deze kan misschien wel helpen om details uit de scene te halen en edge detection van het object als geheel makkelijker te maken
+                case ("Closing"):
                     try
                     {
                         rounds = int.Parse(textBox1.Text);
@@ -211,8 +211,8 @@ namespace INFOIBV
                 case ("Tag zones"):
                     TagZones();
                     break;
-                case ("Pipeline v0_2"):
-                    PipelineV0_2();
+                case ("Pipeline v1_0"):
+                    PipelineV1_0();
                     break;
                 case ("Nothing"):
                 default:
@@ -1211,7 +1211,7 @@ namespace INFOIBV
             }
         }
 
-        private void PipelineV0_2()
+        private void PipelineV1_0()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
