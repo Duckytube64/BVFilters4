@@ -851,6 +851,7 @@ namespace INFOIBV
                 }
 
             int[] zoneSizes = CountZoneSizes();
+            int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
 
             for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
                 for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
@@ -872,7 +873,7 @@ namespace INFOIBV
                                 minTagVal = zoneSizes[k];
                                 minTag = k;
                             }
-                        edge[x, y] = minTag;
+                        newEdge[x, y] = minTag;
                         areaCounter[minTag]++;
                         Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
                     }
@@ -880,6 +881,8 @@ namespace INFOIBV
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
+                    if (newEdge[i, j] > 1)
+                        edge[i, j] = newEdge[i, j];
                     int tag = edge[i, j];
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
@@ -951,7 +954,6 @@ namespace INFOIBV
             return zoneSizes;
         }
         
-
         private void BoundaryTrace(int tag)
         {
             // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
@@ -1102,16 +1104,18 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            CheckIfZonesSurrounded();
-            
+            //CheckIfZonesSurrounded();            
 
-            pipelineing = false;
+            //pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
         {
-            StructuringElement("Rectangle", 2);
-            Closing(1);
+            if (!colorED)
+            {
+                StructuringElement("Rectangle", 2);
+                Closing(1);
+            }
             EdgeDetection("Sobel", colorED);
             ContrastAdjustment();
             NiblackThresholding();
