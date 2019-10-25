@@ -1138,7 +1138,7 @@ namespace INFOIBV
             }
             
 
-            //pipelineing = false;
+            pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
