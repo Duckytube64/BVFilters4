@@ -902,7 +902,7 @@ namespace INFOIBV
                     else if (tag == 0)
                         Image[i, j] = Color.FromArgb(0, 0, 0);
                     else
-                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 551 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 421 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }
         }
         
@@ -1017,17 +1017,11 @@ namespace INFOIBV
         // The handle gap is always surrounded by the mug
         private List<int>[] CheckIfZonesSurrounded()        // We kunnen nog toevoegen dat het een % uitrekend van welke tags om elke tag heen zitten, en dat met een hoog % een tag nogsteeds een andere omsingeld (vanwege thresholding fouten enzo kunnen er gaten in het handvat van de mok zitten)
         {
-            List<int>[] hasSurrounded = new List<int>[tagNr + 1];   // Als tagNr = x dan moet je array x + 1 zijn om ze allemaal erin te gooien
-            for (int index = 0; index <= tagNr; index++)
-            {
-                hasSurrounded[index] = new List<int>();
-            }
-
-            for (int tag = 2; tag <= tagNr; tag++)
-            {
-                CheckTag(tag, hasSurrounded);               // For each tag#...
-            }
-
+            List<int>[] hasSurrounded = new List<int>[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)            
+                hasSurrounded[i] = new List<int>();            
+            for (int tag = 2; tag <= tagNr; tag++)            
+                CheckTag(tag, hasSurrounded);               // For each tag#...            
             return hasSurrounded;
         }
 
@@ -1088,6 +1082,77 @@ namespace INFOIBV
             circularity[tag] = 4 * Math.PI * (zoneSizes[tag] / perimeterSquared);
         }
 
+        // If we take the boundingbox of a object and split it in two,
+        // there should be a noticable difference in the density of tag pixels between the two boxes
+        // if we have a mug, as the hole in the handle lowers the density significantly
+        private float[,] BBDensityCompare()
+        {
+            //KAPUT
+            float[,] zoneDensities = new float[tagNr + 1, 2];
+            //int minX = 512, minY = 512, maxX = 0, maxY = 0;
+
+            //for (int tag = 2; tag <= tagNr; tag++)
+            //{
+            //    for (int x = 0; x < Image.GetLength(0); x++)
+            //        for (int y = 0; y < Image.GetLength(1); y++)
+            //            if (edge[x, y] == tag)
+            //            {
+            //                if (x < minX)
+            //                    minX = x;
+            //                if (x > maxX)
+            //                    maxX = x;
+            //                if (y < minY)
+            //                    minY = y;
+            //                if (y > maxY)
+            //                    maxY = y;
+            //            }
+
+            //    float boxSize = (maxX - minX) / 2 * (maxY - minY);
+            //    float count1 = 0, count2 = 0;
+
+            //    for (int x = minX; x < minX + (maxX - minX) / 2; x++)       // Count left BB
+            //        for (int y = minY; y < maxY; y++)
+            //            if (edge[x, y] == tag)
+            //                count1++;
+            //    zoneDensities[tag, 0] = count1 / boxSize;
+
+            //    for (int x = minX + (maxX - minX) / 2; x <= maxX; x++)      // Count right BB
+            //        for (int y = minY; y < maxY; y++)
+            //            if (edge[x, y] == tag)
+            //                count2++;
+            //    zoneDensities[tag, 1] = count2 / boxSize;
+            //}
+            return zoneDensities;
+        }
+
+        private void GradeMug(float[] roundness, float[] compactness, float[,] zoneDensities, List<int>[] hasSurrounded)
+        {
+            int[] grades = new int[tagNr + 1];
+            List<int> mugs = new List<int>();
+
+            for (int tag = 2; tag <= tagNr; tag++)
+            {
+                if (roundness[tag] > 0.5 && roundness[tag] < 0.7)
+                    grades[tag]++;
+                if (compactness[tag] > 0.1 && compactness[tag] < 0.2)
+                    grades[tag]++;
+                if (Math.Max(zoneDensities[tag, 0], zoneDensities[tag, 1]) >= Math.Min(zoneDensities[tag, 0], zoneDensities[tag, 1] * 1.2))
+                    grades[tag]++;
+                if (hasSurrounded[tag][0] != 0)
+                    grades[tag] += 2;
+                if (grades[tag] >= 3)
+                    mugs.Add(tag);
+            }
+
+            foreach(int tag in mugs)
+            {
+                for (int x = 0; x < Image.GetLength(0); x++)
+                    for (int y = 0; y < Image.GetLength(1); y++)
+                        if (edge[x, y] == tag)
+                            Image[x, y] = Color.FromArgb(tag * 20, tag * 20, tag * 20);
+            }
+        }
+
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
         private void PipelineV0_2()
@@ -1116,19 +1181,19 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
+            float[,] zoneDensities = BBDensityCompare();
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
                 BoundaryTrace(i);
             }
-            CheckIfZonesSurrounded();
+            List<int>[] hasSurrounded = CheckIfZonesSurrounded();
             compactness = new double[tagNr + 1];
             circularity = new double[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
                 CompactnessAndCircularity(i);
-            }
-            
+            }            
 
             pipelineing = false;
         }
