@@ -1204,18 +1204,19 @@ namespace INFOIBV
                 grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)], colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
             pipelineing = true;
 
-            OriginalImage = CopyImage(ref OriginalImage, Image);
+            CopyImage(ref OriginalImage, Image);
             Grayscale();
             ContrastAdjustment();
-            grayImage = CopyImage(ref grayImage, Image);
+            CopyImage(ref grayImage, Image);
             GetEdge(false);
-            grayEdge = CopyImage(ref grayEdge, Image);
-            Image = CopyImage(ref Image, OriginalImage);
+            CopyImage(ref grayEdge, Image);
+            CopyImage(ref Image, OriginalImage);
             GetEdge(true);
-            colorEdge = CopyImage(ref colorEdge, Image);
+            CopyImage(ref colorEdge, Image);
             Or(grayEdge, colorEdge);
+            RegisterEdges();
 
-            BinaryImage = CopyImage(ref BinaryImage, Image);
+            CopyImage(ref BinaryImage, Image);
             TagZones();
             CheckIfZonesSurrounded();
             
@@ -1233,12 +1234,11 @@ namespace INFOIBV
             ReduceBinaryNoise();
         }
 
-        private Color[,] CopyImage(ref Color[,] input, Color[,] toCopy)
+        private void CopyImage(ref Color[,] input, Color[,] toCopy)
         {
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                     input[x, y] = toCopy[x, y];
-            return input;
         }
 
         private void saveButton_Click(object sender, EventArgs e)
