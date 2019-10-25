@@ -20,7 +20,6 @@ namespace INFOIBV
         string mode;
         bool[,] H;
         int rounds;
-        int[] zonesizes;
         bool[,] potentialEdge;
         double[] perimeterCounter;
         double[] compactness;
@@ -537,7 +536,7 @@ namespace INFOIBV
         {
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10));       // Depending on the image size, take a filterradius between 2 and 10
+            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10)) + 5;       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
@@ -1000,7 +999,7 @@ namespace INFOIBV
                         }
                         for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for pixels with another tag                        
                             for (int j = -1; j <= 1; j++)
-                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && edge[x + i, y + j] != tag)
+                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && edge[x + i, y + j] != tag && (i == 0 || j == 0))
                                     potentialEdge[x, y] = true;
                     }
                     if (!pipelineing)
@@ -1163,21 +1162,24 @@ namespace INFOIBV
             return zoneDensities;
         }
 
-        private void GradeMug(float[] roundness, float[] compactness, float[,] zoneDensities, List<int>[] hasSurrounded)
+        private void GradeMug(double[] roundness, double[] compactness,/* double[,] zoneDensities,*/ List<int>[] hasSurrounded)
         {
             int[] grades = new int[tagNr + 1];
             List<int> mugs = new List<int>();
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                if (roundness[tag] > 0.5 && roundness[tag] < 0.7)
+                if (roundness[tag] > 0.65 && roundness[tag] < 0.75)
                     grades[tag]++;
-                if (compactness[tag] > 0.1 && compactness[tag] < 0.2)
+                if (compactness[tag] > 0.04 && compactness[tag] < 0.06)
                     grades[tag]++;
-                if (Math.Max(zoneDensities[tag, 0], zoneDensities[tag, 1]) >= Math.Min(zoneDensities[tag, 0], zoneDensities[tag, 1] * 1.2))
-                    grades[tag]++;
-                if (hasSurrounded[tag][0] != 0)
-                    grades[tag] += 2;
+                //  if (Math.Max(zoneDensities[tag, 0], zoneDensities[tag, 1]) >= Math.Min(zoneDensities[tag, 0], zoneDensities[tag, 1] * 1.2))
+                //      grades[tag]++;
+                if (hasSurrounded[tag].Any())
+                {
+                    if (hasSurrounded[tag][0] != 0)
+                        grades[tag] += 2;
+                }
                 if (grades[tag] >= 3)
                     mugs.Add(tag);
             }
@@ -1187,7 +1189,7 @@ namespace INFOIBV
                 for (int x = 0; x < Image.GetLength(0); x++)
                     for (int y = 0; y < Image.GetLength(1); y++)
                         if (edge[x, y] == tag)
-                            Image[x, y] = Color.FromArgb(tag * 20, tag * 20, tag * 20);
+                            Image[x, y] = Color.Red;
             }
         }
 
@@ -1231,7 +1233,9 @@ namespace INFOIBV
             for (int i = 0; i <= tagNr; i++)
             {
                 CompactnessAndCircularity(i);
-            }            
+            }
+            CopyImage(ref Image, OriginalImage);
+            GradeMug(circularity, compactness, hasSurrounded);         
 
             pipelineing = false;
         }
