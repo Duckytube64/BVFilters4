@@ -21,7 +21,7 @@ namespace INFOIBV
         bool[,] H;
         int rounds;
         bool[,] potentialEdge;
-        List<int> areaCounter;
+        int[] areaCounter;
         int[] perimeterCounter;
         double[] compactness;
         double[] circularity;
@@ -542,12 +542,13 @@ namespace INFOIBV
                     double variance = 0;
                     int counter = 0;
                     int[] histogram = new int[256];
+                    int width = InputImage.Size.Width, height = InputImage.Size.Height;
 
                     for (int i = 0 - filterradius; i <= filterradius; i++)
                     {
                         for (int j = 0 - filterradius; j <= filterradius; j++)
                         {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                             {
                                 int value = OriginalImage[x + i, y + j].R;
                                 mean += value;
@@ -853,30 +854,44 @@ namespace INFOIBV
 
             int[] zoneSizes = CountZoneSizes();
             int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
+            bool pixelsDistributed = false;
 
-            for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
-                for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
-                    if (edge[x, y] == 1)
-                    {
-                        Image[x, y] = Color.Red;
-                        bool[] tagNeighborhood = new bool[tagNr + 1];
-                        int minTagVal = Image.GetLength(0) * Image.GetLength(1) + 1;
-                        int minTag = tagNr + 1;
+            while (!pixelsDistributed)
+            {
+                pixelsDistributed = true;
+                for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
+                    for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
+                        if (edge[x, y] == 1)
+                        {
+                            Image[x, y] = Color.Red;
+                            bool[] tagNeighborhood = new bool[tagNr + 1];
+                            int minTagVal = Image.GetLength(0) * Image.GetLength(1) + 1;
+                            int minTag = tagNr + 1;
+                            int ceilingTag = tagNr + 1;
 
-                        for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
-                            for (int j = -2; j <= 2; j++)
-                                if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                                    tagNeighborhood[edge[x + i, y + j]] = true;
+                            for (int i = -2; i <= 2; i++)               // Get the tag# of pixels in the 8 neighbourhood
+                                for (int j = -2; j <= 2; j++)
+                                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                                        tagNeighborhood[edge[x + i, y + j]] = true;
 
-                        for (int k = 2; k <= tagNr; k++)
-                            if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                            for (int k = 2; k <= tagNr; k++)
+                                if (tagNeighborhood[k] && zoneSizes[k] < minTagVal)      // het idee was juist om de minimaal voorkomende te nemen, zodat bij randen eerder de voor- dan de achtergrond wordt gekozen, maar het lijkt niet goed te werken (en wss het maximum nemen ook niet)
+                                {
+                                    minTagVal = zoneSizes[k];
+                                    minTag = k;
+                                }
+                            if (minTag < ceilingTag)
                             {
-                                minTagVal = zoneSizes[k];
-                                minTag = k;
+                                newEdge[x, y] = minTag;
                             }
-                        edge[x, y] = minTag;
-                        Image[x, y] = Color.FromArgb(231 * minTag % 256, 301 * minTag % 256, 551 * minTag % 256);
-                    }
+                            //else
+                            //    pixelsDistributed = false;
+                        }
+                for (int i = 0; i < edge.GetLength(0); i++)
+                    for (int j = 0; j < edge.GetLength(1); j++)
+                        if (newEdge[i, j] > 1)
+                            edge[i, j] = newEdge[i, j];
+            }
 
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
@@ -886,6 +901,8 @@ namespace INFOIBV
                     int tag = edge[i, j];
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
+                    else if (tag == 0)
+                        Image[i, j] = Color.FromArgb(0, 0, 0);
                     else
                         Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 551 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
                 }
@@ -902,15 +919,6 @@ namespace INFOIBV
                 int x = currPos.X, y = currPos.Y;
 
                 edge[x,y] = tagNr;
-                
-                /// 8-Neighborhood-way
-                //for (int i = -1; i <= 1; i++)
-                //    for (int j = -1; j <= 1; j++)
-                //        if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
-                //        {
-                //            if (edge[x + i, y + j] == 0)
-                //                zonePoints.Push(new Point(x + i, y + j));
-                //        }
 
                 /// Ugly hardcoded 4-Neighborhood-way
                 int i = 0;
@@ -1057,12 +1065,8 @@ namespace INFOIBV
                 for (int x = 0; x < img1.GetLength(0); x++)                
                     for (int y = 0; y < img1.GetLength(1); y++)
                     {
-                        if (img1[x, y].R == 255 || img2[x, y].R == 255)
-                            Image[x, y] = Color.FromArgb(255, 255, 255);
-                        else
-                            Image[x, y] = Color.FromArgb(0, 0, 0);
-                        if (!pipelineing)
-                            progressBar.PerformStep();                          // Increment progress bar
+                        int maxColorVal = Math.Max(img1[x, y].R, img2[x, y].R);
+                        Image[x, y] = Color.FromArgb(maxColorVal, maxColorVal, maxColorVal);
                     }                
         }
 
@@ -1108,22 +1112,18 @@ namespace INFOIBV
             GetEdge(true);
             CopyImage(ref colorEdge, Image);
             Or(grayEdge, colorEdge);
+            NiblackThresholding();
+            ReduceBinaryNoise();
             RegisterEdges();
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            areaCounter = new List<int>();
-            for(int i = 0; i <= tagNr; i++)
-            {
-                areaCounter.Add(0);
-            }
-            for(int x = 0; x < InputImage.Size.Width; x++)
-            {
+            areaCounter = new int[tagNr + 1];
+            for(int x = 0; x < InputImage.Size.Width; x++)            
                 for(int y = 0; y < InputImage.Size.Height; y++)
                 {
                     areaCounter[edge[x, y]]++;
-                }
-            }
+                }            
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
@@ -1150,8 +1150,6 @@ namespace INFOIBV
             }
             EdgeDetection("Sobel", colorED);
             ContrastAdjustment();
-            NiblackThresholding();
-            ReduceBinaryNoise();
         }
 
         private void CopyImage(ref Color[,] input, Color[,] toCopy)
