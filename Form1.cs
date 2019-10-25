@@ -212,7 +212,7 @@ namespace INFOIBV
                     TagZones();
                     break;
                 case ("Pipeline v0_1"):
-                    PipelineV0_1();
+                    PipelineV0_2();
                     break;
                 case ("Nothing"):
                 default:
@@ -855,7 +855,6 @@ namespace INFOIBV
             zoneSizes = CountZoneSizes();
             int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
             bool pixelsDistributed = false;
-            double maxDistSqd = 255 * 255 * 3;
 
             while (!pixelsDistributed)
             {
@@ -1085,13 +1084,13 @@ namespace INFOIBV
         private void CompactnessAndCircularity(int tag)
         {
             double perimeterSquared = Math.Sqrt(perimeterCounter[tag]);
-            compactness[tag] = areaCounter[tag] / perimeterSquared;
-            circularity[tag] = 4 * Math.PI * (areaCounter[tag] / perimeterSquared);
+            compactness[tag] = zoneSizes[tag] / perimeterSquared;
+            circularity[tag] = 4 * Math.PI * (zoneSizes[tag] / perimeterSquared);
         }
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
-        private void PipelineV0_1()
+        private void PipelineV0_2()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
@@ -1117,7 +1116,6 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            //areaCounter = new int[tagNr + 1];                         <-- deze berekenen we al in TagZones, heet zoneSizes
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
