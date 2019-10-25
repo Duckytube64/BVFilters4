@@ -850,6 +850,7 @@ namespace INFOIBV
                 }
 
             int[] zoneSizes = CountZoneSizes();
+            int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
 
             for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
                 for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
@@ -878,6 +879,8 @@ namespace INFOIBV
             for (int i = 0; i < edge.GetLength(0); i++)             // Visualise every tag group by coloring them in            
                 for (int j = 0; j < edge.GetLength(1); j++)
                 {
+                    if (newEdge[i, j] > 1)
+                        edge[i, j] = newEdge[i, j];
                     int tag = edge[i, j];
                     if (tag == 1)
                         Image[i, j] = Color.FromArgb(255, 255, 255);
@@ -944,7 +947,6 @@ namespace INFOIBV
             return zoneSizes;
         }
         
-
         private void BoundaryTrace(int tag)
         {
             // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
@@ -1088,18 +1090,19 @@ namespace INFOIBV
                 grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)], colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
             pipelineing = true;
 
-            OriginalImage = CopyImage(ref OriginalImage, Image);
+            CopyImage(ref OriginalImage, Image);
             Grayscale();
             ContrastAdjustment();
-            grayImage = CopyImage(ref grayImage, Image);
+            CopyImage(ref grayImage, Image);
             GetEdge(false);
-            grayEdge = CopyImage(ref grayEdge, Image);
-            Image = CopyImage(ref Image, OriginalImage);
+            CopyImage(ref grayEdge, Image);
+            CopyImage(ref Image, OriginalImage);
             GetEdge(true);
-            colorEdge = CopyImage(ref colorEdge, Image);
+            CopyImage(ref colorEdge, Image);
             Or(grayEdge, colorEdge);
+            RegisterEdges();
 
-            BinaryImage = CopyImage(ref BinaryImage, Image);
+            CopyImage(ref BinaryImage, Image);
             TagZones();
             areaCounter = new List<int>();
             for(int i = 0; i <= tagNr; i++)
@@ -1121,25 +1124,27 @@ namespace INFOIBV
             CheckIfZonesSurrounded();
             //CompactnessAndCircularity();
 
-            pipelineing = false;
+            //pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
         {
-            StructuringElement("Rectangle", 2);
-            Closing(1);
+            if (!colorED)
+            {
+                StructuringElement("Rectangle", 2);
+                Closing(1);
+            }
             EdgeDetection("Sobel", colorED);
             ContrastAdjustment();
             NiblackThresholding();
             ReduceBinaryNoise();
         }
 
-        private Color[,] CopyImage(ref Color[,] input, Color[,] toCopy)
+        private void CopyImage(ref Color[,] input, Color[,] toCopy)
         {
             for (int x = 0; x < InputImage.Size.Width; x++)
                 for (int y = 0; y < InputImage.Size.Height; y++)
                     input[x, y] = toCopy[x, y];
-            return input;
         }
 
         private void saveButton_Click(object sender, EventArgs e)
