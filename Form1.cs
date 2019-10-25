@@ -21,7 +21,7 @@ namespace INFOIBV
         bool[,] H;
         int rounds;
         bool[,] potentialEdge;
-        List<int> areaCounter;
+        int[] areaCounter;
         int[] perimeterCounter;
 
         public INFOIBV()
@@ -881,7 +881,6 @@ namespace INFOIBV
                             if (minTag < ceilingTag)
                             {
                                 newEdge[x, y] = minTag;
-                                areaCounter[minTag]++;
                             }
                             //else
                             //    pixelsDistributed = false;
@@ -918,11 +917,6 @@ namespace INFOIBV
                 int x = currPos.X, y = currPos.Y;
 
                 edge[x,y] = tagNr;
-                while (areaCounter.Count <= tagNr)
-                {
-                    areaCounter.Add(0);
-                }
-                areaCounter[tagNr]++;
 
                 /// Ugly hardcoded 4-Neighborhood-way
                 int i = 0;
@@ -1116,18 +1110,12 @@ namespace INFOIBV
 
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            areaCounter = new List<int>();
-            for(int i = 0; i <= tagNr; i++)
-            {
-                areaCounter.Add(0);
-            }
-            for(int x = 0; x < InputImage.Size.Width; x++)
-            {
+            areaCounter = new int[tagNr + 1];
+            for(int x = 0; x < InputImage.Size.Width; x++)            
                 for(int y = 0; y < InputImage.Size.Height; y++)
                 {
                     areaCounter[edge[x, y]]++;
-                }
-            }
+                }            
             perimeterCounter = new int[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
