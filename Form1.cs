@@ -22,6 +22,8 @@ namespace INFOIBV
         int rounds;
         bool[,] potentialEdge;
         int[] perimeterCounter;
+        double[] compactness;
+        double[] circularity;
 
         public INFOIBV()
         {
@@ -1080,6 +1082,12 @@ namespace INFOIBV
                 }
         }
 
+        private void CompactnessAndCircularity(int tag)
+        {
+            double perimeterSquared = Math.Sqrt(perimeterCounter[tag]);
+            compactness[tag] = areaCounter[tag] / perimeterSquared;
+            circularity[tag] = 4 * Math.PI * (areaCounter[tag] / perimeterSquared);
+        }
 
         // misschien een idee om naar Color Edge detection te kijken, maakt nogal verschil in performance:
         // https://nl.mathworks.com/matlabcentral/fileexchange/28114-fast-edges-of-a-color-image-actual-color-not-converting-to-grayscale
@@ -1116,7 +1124,13 @@ namespace INFOIBV
                 BoundaryTrace(i);
             }
             CheckIfZonesSurrounded();
-            //CompactnessAndCircularity();
+            compactness = new double[tagNr + 1];
+            circularity = new double[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)
+            {
+                CompactnessAndCircularity(i);
+            }
+            
 
             pipelineing = false;
         }
