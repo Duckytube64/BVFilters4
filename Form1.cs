@@ -704,11 +704,17 @@ namespace INFOIBV
 
                     int maxDist = (int)Math.Max((width + height) / 2 * 0.15f, 5) + 10;
 
+                    Dictionary<Point, List<Point>> matchedPoints = new Dictionary<Point, List<Point>>();
+
                     foreach (Point p in ends)
+                    {
+                        matchedPoints.Add(p, new List<Point>());
                         foreach (Point q in ends)
                         {
-                            if (p == q)
-                                continue;
+                            matchedPoints[p].Add(q);
+                            if (matchedPoints.ContainsKey(q))
+                                if (matchedPoints[q].Contains(p))
+                                    continue;
                             if (Math.Abs(p.X - q.X) > maxDist || Math.Abs(p.Y - q.Y) > maxDist)
                                 continue;
                             // Check if two ends are relatively close to each other
@@ -761,6 +767,7 @@ namespace INFOIBV
                                 //    }
                             }
                         }
+                    }
                 }
             }
             //RegisterEdges();
