@@ -705,8 +705,10 @@ namespace INFOIBV
                                 // Make all pixels in a small area between them white if they have a minimal edgestrength
                                 for (int x = minX; x < maxX; x++)
                                     for (int y = minY; y < maxY; y++)
-                                        if (edImage[x, y].R > 20)
-                                            Image[x, y] = Color.FromArgb(0, 155, 155);
+                                        if (Math.Sqrt(Math.Pow(Math.Abs(p.X - x), 2) + Math.Pow(Math.Abs(p.Y - y), 2)) < 10)        // If the pixel is within a 10 radius from p and q
+                                            if (Math.Sqrt(Math.Pow(Math.Abs(q.X - x), 2) + Math.Pow(Math.Abs(q.Y - y), 2)) < 10)
+                                                if (edImage[x, y].R > 20)       // <--- minimum edgestrength
+                                                    Image[x, y] = Color.FromArgb(0, 155, 155);
                             }
                         }                    
                 }
