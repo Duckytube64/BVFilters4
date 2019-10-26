@@ -597,6 +597,19 @@ namespace INFOIBV
             RegisterEdges();
         }
 
+        private void RegisterEdges()
+        {
+            edge = new int[width, height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                {
+                    if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
+                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
+                    if (Image[x, y].R == 255)
+                        edge[x, y] = 1;
+                }
+        }
+
         private void ReduceBinaryNoise()
         {
             bool[,] covered = new bool[Image.GetLength(0), Image.GetLength(1)];
@@ -638,6 +651,110 @@ namespace INFOIBV
                             }
                     }
                 }
+        }
+
+        int[,] edgeTags;
+
+        private void CompleteShapes()
+        {
+            List<int> edgeLineSizes = CountEdgeLineSizes();
+            for (int index = 0; index < edgeLineSizes.Count; index++)
+            {
+                if (edgeLineSizes[index] > (int)Math.Max((width + height) * 0.2f, 15))
+                {
+                    // Find the points on a edgeLine that 'sticks out the most' aka are on the end of the line with the fewest neighbours
+                    List<Point>[] tagNeigbours = new List<Point>[25];
+                    for (int k = 0; k < tagNeigbours.Count(); k++)
+                        tagNeigbours[k] = new List<Point>();
+                    for (int x = 0; x < width; x++)
+                        for (int y = 0; y < height; y++)
+                            if (edgeTags[x,y] == index + 1)
+                            {
+                                int count = 0;
+                                for (int i = -2; i < 2; i++)
+                                    for (int j = -2; j < 2; j++)
+                                        if (x + i >= 0 && y + j >= 0 && x + i < width && y + j < height)
+                                            if (edgeTags[x + i, y + j] == index + 1)
+                                                count++;
+                                tagNeigbours[count].Add(new Point(x, y));
+                            }
+                    List<Point> ends = new List<Point>();
+                    bool lastPoints = false;
+                    for(int a = 0; a < tagNeigbours.Count(); a++)
+                        if (tagNeigbours[a].Any())
+                        {
+                            foreach (Point p in tagNeigbours[a])
+                                ends.Add(p);
+                            if (lastPoints)
+                                break;
+                            if (ends.Count >= 10)
+                                break;
+                            else if (ends.Count >= 2)
+                                lastPoints = true;
+                        }
+                    if (ends.Count < 2)
+                        continue;
+                    foreach (Point p in ends)                    
+                        foreach (Point q in ends)
+                        {
+                            // Check if two ends are relatively close to each other
+                            if (Math.Abs(p.X - q.X) + Math.Abs(p.Y - q.Y) < Math.Max((width + height) / 2 * 0.15f, 5))
+                            {
+                                int minX = Math.Max(Math.Min(p.X, q.X) - 10, 0), minY = Math.Max(Math.Min(p.Y, q.Y) - 10, 0);
+                                int maxX = Math.Min(Math.Max(p.X, q.X) + 10, width), maxY = Math.Min(Math.Max(p.Y, q.Y) + 10, height);
+                                // Make all pixels in a small area between them white if they have a minimal edgestrength
+                                for (int x = minX; x < maxX; x++)
+                                    for (int y = minY; y < maxY; y++)
+                                        if (edImage[x, y].R > 20)
+                                            Image[x, y] = Color.FromArgb(0, 155, 155);
+                            }
+                        }                    
+                }
+            }
+        }
+
+        private List<int> CountEdgeLineSizes()
+        {
+            List<int> EdgeLineSizes = new List<int>();
+            edgeTags = new int[width, height];
+            int nrCount = 1;
+
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    if (edge[x,y] == 1 && edgeTags[x,y] == 0)
+                    {
+                        int count = 0;
+                        Stack<Point> linePoints = new Stack<Point>();
+                        linePoints.Push(new Point(x, y));
+
+                        while (linePoints.Count > 0)
+                        {
+
+                            count++;
+                            Point currPos = linePoints.Pop();
+                            int X = currPos.X, Y = currPos.Y;
+                            edgeTags[X, Y] = nrCount;
+
+                            for (int i = -1; i <= 1; i = i + 2)
+                                if (X + i >= 0 && X + i < Image.GetLength(0))
+                                    if (edge[X + i, Y] == 1 && edgeTags[X + i, Y] == 0)
+                                    {
+                                        linePoints.Push(new Point(X + i, Y));
+                                        edgeTags[X + i, Y] = nrCount;
+                                    }
+
+                            for (int j = -1; j <= 1; j = j + 2)
+                                if (Y + j >= 0 && Y + j < Image.GetLength(1))
+                                    if (edge[X, Y + j] == 1 && edgeTags[X, Y + j] == 0)
+                                    {
+                                        linePoints.Push(new Point(X, Y + j));
+                                        edgeTags[X, Y] = nrCount;
+                                    }                    
+                        }
+                        EdgeLineSizes.Add(count);
+                        nrCount++;
+                    }
+            return EdgeLineSizes;
         }
 
         private void StructuringElement(string Mode, int size)
@@ -1101,19 +1218,6 @@ namespace INFOIBV
                     }                
         }
 
-        private void RegisterEdges()
-        {
-            edge = new int[width, height];
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                {
-                    if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
-                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
-                    if (Image[x, y].R == 255)
-                        edge[x, y] = 1;
-                }
-        }
-
         private void CompactnessAndCircularity(int tag)
         {
             double perimeterSquared = Math.Pow(perimeterCounter[tag], 2);
@@ -1213,14 +1317,20 @@ namespace INFOIBV
             }
         }
 
+        Color[,] OriginalImage, grayImage, tagImage, BinaryImage, grayEdge, colorEdge, edImage;
+
         private void PipelineV1_1()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            Color[,] OriginalImage = new Color[Image.GetLength(0), Image.GetLength(1)], grayImage = new Color[Image.GetLength(0), Image.GetLength(1)],
-                tagImage = new Color[Image.GetLength(0), Image.GetLength(1)], BinaryImage = new Color[Image.GetLength(0), Image.GetLength(1)], 
-                grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)], colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
+            OriginalImage = new Color[Image.GetLength(0), Image.GetLength(1)];
+            grayImage = new Color[Image.GetLength(0), Image.GetLength(1)];
+            grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
+            colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
+            edImage = new Color[Image.GetLength(0), Image.GetLength(1)];
+            BinaryImage = new Color[Image.GetLength(0), Image.GetLength(1)];
+            tagImage = new Color[Image.GetLength(0), Image.GetLength(1)];
 
             pipelineing = true;
             label2.Visible = true;
@@ -1238,41 +1348,44 @@ namespace INFOIBV
             CopyImage(ref colorEdge, Image);
             ShowImage();
             Or(grayEdge, colorEdge);
+            CopyImage(ref edImage, Image);
             ShowImage();
 
             label2.Text = "Creating binary image..."; ap.Refresh();
             NiblackThresholding();
+            //hier ShapeCompletion
             ReduceBinaryNoise();
             RegisterEdges();
             ShowImage();
-            System.Threading.Thread.Sleep(2500);
+            CompleteShapes();
+            //System.Threading.Thread.Sleep(2500);
 
-            label2.Text = "Tagging zones..."; ap.Refresh();
-            CopyImage(ref BinaryImage, Image);
-            TagZones();
-            ShowImage();
+            //label2.Text = "Tagging zones..."; ap.Refresh();
+            //CopyImage(ref BinaryImage, Image);
+            //TagZones();
+            //ShowImage();
 
-            label2.Text = "Evaluating..."; ap.Refresh();
-            perimeterCounter = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)
-            {
-                BoundaryTrace(i);
-            }
-            compactness = new double[tagNr + 1];
-            circularity = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)
-            {
-                CompactnessAndCircularity(i);
-            }
-            CopyImage(ref Image, OriginalImage);
+            //label2.Text = "Evaluating..."; ap.Refresh();
+            //perimeterCounter = new double[tagNr + 1];
+            //for (int i = 0; i <= tagNr; i++)
+            //{
+            //    BoundaryTrace(i);
+            //}
+            //compactness = new double[tagNr + 1];
+            //circularity = new double[tagNr + 1];
+            //for (int i = 0; i <= tagNr; i++)
+            //{
+            //    CompactnessAndCircularity(i);
+            //}
+            //CopyImage(ref Image, OriginalImage);
 
-            float[,] zoneDensities = BBDensityCompare();
-            List<int>[] hasSurrounded = CheckIfZonesSurrounded();
-            GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
+            //float[,] zoneDensities = BBDensityCompare();
+            //List<int>[] hasSurrounded = CheckIfZonesSurrounded();
+            //GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
-            label2.Text = "";
-            label2.Visible = false;
-            pipelineing = false;
+            //label2.Text = "";
+            //label2.Visible = false;
+            //pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
