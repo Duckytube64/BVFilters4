@@ -19,7 +19,7 @@ namespace INFOIBV
         bool doubleProgress = false, pipelineing = false;
         string mode;
         bool[,] H;
-        int rounds;
+        int width, height, rounds;
         bool[,] potentialEdge;
         double[] perimeterCounter;
         double[] compactness;
@@ -43,6 +43,8 @@ namespace INFOIBV
                     MessageBox.Show("Error in image dimensions (have to be > 0 and <= 512)");
                 else
                     pictureBox1.Image = (Image)InputImage;                 // Display input image
+                width = InputImage.Size.Width;
+                height = InputImage.Size.Height;
             }
         }
 
@@ -70,19 +72,19 @@ namespace INFOIBV
 
             if (InputImage == null) return;                                 // Get out if no input image
             if (OutputImage != null) OutputImage.Dispose();                 // Reset output image
-            OutputImage = new Bitmap(InputImage.Size.Width, InputImage.Size.Height); // Create new output image
-            Image = new Color[InputImage.Size.Width, InputImage.Size.Height];       // Create array to speed-up operations (Bitmap functions are very slow)
+            OutputImage = new Bitmap(InputImage.Size.Width, height); // Create new output image
+            Image = new Color[InputImage.Size.Width, height];       // Create array to speed-up operations (Bitmap functions are very slow)
 
             // Setup progress bar
             progressBar.Visible = true;
             progressBar.Minimum = 1;
-            progressBar.Maximum = InputImage.Size.Width * InputImage.Size.Height;
+            progressBar.Maximum = width * height;
             progressBar.Value = 1;
             progressBar.Step = 1;
 
             // Copy input Bitmap to array            
-            for (int x = 0; x < InputImage.Size.Width; x++)            
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)            
+                for (int y = 0; y < height; y++)
                 {
                     Image[x, y] = InputImage.GetPixel(x, y);                // Set pixel color in array at (x,y)
                 }            
@@ -220,23 +222,24 @@ namespace INFOIBV
             }
             //==========================================================================================
 
-            // Copy array to output Bitmap
-            for (int x = 0; x < InputImage.Size.Width; x++)
-            {
-                for (int y = 0; y < InputImage.Size.Height; y++)
-                {
-                    OutputImage.SetPixel(x, y, Image[x, y]);               // Set the pixel color at coordinate (x,y)
-                }
-            }
-
-            ap.Image = (Image)OutputImage;                         // Display output image
+            ShowImage();
             progressBar.Visible = false;                                    // Hide progress bar
+        }
+
+        private void ShowImage()
+        {
+            // Copy array to output Bitmap
+            for (int x = 0; x < width; x++)            
+                for (int y = 0; y < height; y++)                
+                    OutputImage.SetPixel(x, y, Image[x, y]);                // Set the pixel color at coordinate (x,y)
+            ap.Image = (Image)OutputImage;                                  // Display output image
+            Refresh();
         }
 
         private void Negative()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     Color updatedColor = Color.FromArgb(255 - pixelColor.R, 255 - pixelColor.G, 255 - pixelColor.B); // Negative image
@@ -248,8 +251,8 @@ namespace INFOIBV
 
         private void Grayscale()
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     int Clinear = (int)(0.2126f * pixelColor.R + 0.7152 * pixelColor.G + 0.0722 * pixelColor.B); // Calculate grayscale
@@ -264,9 +267,9 @@ namespace INFOIBV
         {
             byte minimumValue = 255, maximumValue = 0;
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     Color color = Image[x, y];
                     if (color.R != color.G || color.R != color.B)
@@ -279,9 +282,9 @@ namespace INFOIBV
                 }
             }
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     float value = Image[x, y].R;                            // Get the pixel grayscale color at coordinate (x,y)
                     value -= minimumValue;                                  // Calculate the pixel's "grayness" as a percent between minimum- and maximumValue
@@ -296,10 +299,10 @@ namespace INFOIBV
 
         private void LinearFilter(int kernelsize)
         {
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                 }
@@ -307,16 +310,16 @@ namespace INFOIBV
 
             int totalsize = (2 * kernelsize + 1) * (2 * kernelsize + 1);
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     int totalvalue = 0;
                     for (int i = 0 - kernelsize; i <= kernelsize; i++)               // Loop over all pixels in the kernel and add their value to total value
                     {
                         for (int j = 0 - kernelsize; j <= kernelsize; j++)
                         {
-                            if (x + i >= 0 && y + j >= 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height)        // If a pixel is out of image bounds, it has value 0
+                            if (x + i >= 0 && y + j >= 0 && x + i < width && y + j < height)        // If a pixel is out of image bounds, it has value 0
                                 totalvalue += OriginalImage[x + i, y + j].R;
                         }
                     }
@@ -330,10 +333,10 @@ namespace INFOIBV
 
         private void NonlinearFilter(int medianSize)
         {
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                 }
@@ -341,9 +344,9 @@ namespace INFOIBV
 
             float[] pixelValues = new float[(int)Math.Pow(medianSize * 2 + 1, 2)];
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     float value = Image[x, y].R;                            // Get the pixel color at coordinate (x,y)
                     int counter = 0;
@@ -351,7 +354,7 @@ namespace INFOIBV
                     {
                         for (int j = -medianSize; j <= medianSize; j++)
                         {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                             {
                                 pixelValues[counter] = (OriginalImage[x + i, y + j].R);
                                 counter++;
@@ -388,25 +391,25 @@ namespace INFOIBV
                 }
             }
 
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                 }
             }
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     double newGray = 0;
                     for (int i = -kernelsize; i <= kernelsize; i++)
                     {
                         for (int j = -kernelsize; j <= kernelsize; j++)
                         {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                                 newGray += (weightskernel[i + kernelsize, j + kernelsize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
                         }
                     }
@@ -436,22 +439,22 @@ namespace INFOIBV
                     break;
             }
 
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                 }            
 
-            for (int x = 0; x < InputImage.Size.Width; x++)            
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)            
+                for (int y = 0; y < height; y++)
                 {
                     double totalX = 0, totalY = 0;
                     double totalRX = 0, totalRY = 0, totalGX = 0, totalGY = 0, totalBX = 0, totalBY = 0;
                     for (int i = -1; i <= 1; i++)                    
                         for (int j = -1; j <= 1; j++)
                         {
-                            if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                             {
                                 if (!inColor)
                                 {
@@ -516,8 +519,8 @@ namespace INFOIBV
         private void Thresholding(int threshold)
         {
             threshold = Math.Max(0, Math.Min(255, threshold));                  // Clamp threshold between 0 and 255         
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
                     if (pixelColor.R != pixelColor.G || pixelColor.R != pixelColor.B)
@@ -539,24 +542,23 @@ namespace INFOIBV
             int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10)) + 5;       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                 }
             }
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < InputImage.Size.Height; y++)
+                for (int y = 0; y < height; y++)
                 {
                     double mean = 0;
                     double variance = 0;
                     int counter = 0;
                     int[] histogram = new int[256];
-                    int width = InputImage.Size.Width, height = InputImage.Size.Height;
 
                     for (int i = 0 - filterradius; i <= filterradius; i++)
                     {
@@ -757,25 +759,25 @@ namespace INFOIBV
 
             for (int Nr = 0; Nr < rounds; Nr++)
             {
-                Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
-                for (int x = 0; x < InputImage.Size.Width; x++)
+                Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
+                for (int x = 0; x < width; x++)
                 {
-                    for (int y = 0; y < InputImage.Size.Height; y++)
+                    for (int y = 0; y < height; y++)
                     {
                         OriginalImage[x, y] = Image[x, y];
                     }
                 }
 
-                for (int x = 0; x < InputImage.Size.Width; x++)
+                for (int x = 0; x < width; x++)
                 {
-                    for (int y = 0; y < InputImage.Size.Height; y++)
+                    for (int y = 0; y < height; y++)
                     {
                         int minColor = baseMinColor;
                         for (int i = -(size); i <= size; i++)
                         {
                             for (int j = -(size); j <= size; j++)
                             {
-                                if (H[i + size, j + size] && x + i >= 0 && y + j >= 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height) // Do nothing if selected position is out of bounds
+                                if (H[i + size, j + size] && x + i >= 0 && y + j >= 0 && x + i < width && y + j < height) // Do nothing if selected position is out of bounds
                                 {
                                     if (IsErosion)
                                         minColor = Math.Max(minColor, OriginalImage[x + i, y + j].R);
@@ -819,8 +821,8 @@ namespace INFOIBV
             chart1.ResetAutoValues();
             int[] values = new int[256];
             int valuecounter = 0;
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     int value = Image[x, y].R;
                     if (values[value] == 0)
@@ -844,11 +846,11 @@ namespace INFOIBV
 
         private void TagZones()
         {
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];
+            Color[,] OriginalImage = new Color[width, height];
             tagNr = 1;
 
-            for (int x = 0; x < InputImage.Size.Width; x++)                 // Duplicate the original image
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)                 // Duplicate the original image
+                for (int y = 0; y < height; y++)
                 {
                     OriginalImage[x, y] = Image[x, y];
                     if (OriginalImage[x, y] != Color.FromArgb(255, 255, 255) && OriginalImage[x, y] != Color.FromArgb(0, 0, 0) && OriginalImage[x, y] != Color.Black && OriginalImage[x, y] != Color.White)
@@ -978,17 +980,17 @@ namespace INFOIBV
         {
             // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
             // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
-            potentialEdge = new bool[InputImage.Size.Width, InputImage.Size.Height]; // Initialize boolian array to keep track of boundary pixels
-            Color[,] OriginalImage = new Color[InputImage.Size.Width, InputImage.Size.Height];   // Duplicate the original image
+            potentialEdge = new bool[width, height]; // Initialize boolian array to keep track of boundary pixels
+            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
             bool startFound = false;
             Point start = Point.Empty;
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                     OriginalImage[x, y] = Image[x, y];
 
-            for (int x = 0; x < InputImage.Size.Width; x++)                 // Fill in the array of edge pixels
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)                 // Fill in the array of edge pixels
+                for (int y = 0; y < height; y++)
                 {
                     if (edge[x, y] == tag)
                     {
@@ -999,7 +1001,7 @@ namespace INFOIBV
                         }
                         for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for pixels with another tag                        
                             for (int j = -1; j <= 1; j++)
-                                if (x + i > 0 && y + j > 0 && x + i < InputImage.Size.Width && y + j < InputImage.Size.Height && edge[x + i, y + j] != tag && (i == 0 || j == 0))
+                                if (x + i > 0 && y + j > 0 && x + i < width && y + j < height && edge[x + i, y + j] != tag && (i == 0 || j == 0))
                                     potentialEdge[x, y] = true;
                     }
                     if (!pipelineing)
@@ -1021,7 +1023,7 @@ namespace INFOIBV
             {
                 for (int j = -1; j <= 1; j++)
                 {
-                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
+                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < width && start.Y + j < height && boundary[start.X + i, start.Y + j])
                     {
                         if (i != 0 && j != 0)
                         {
@@ -1035,7 +1037,7 @@ namespace INFOIBV
             {
                 for (int j = -1; j <= 1; j++)
                 {
-                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < InputImage.Size.Width && start.Y + j < InputImage.Size.Height && boundary[start.X + i, start.Y + j])
+                    if (start.X + i > 0 && start.Y + j > 0 && start.X + i < width && start.Y + j < height && boundary[start.X + i, start.Y + j])
                     {
                         if (i == 0 || j == 0)
                         {
@@ -1067,12 +1069,12 @@ namespace INFOIBV
             int neighbourCount = 0;
             bool[] neighbourTags = new bool[tagNr + 1];
 
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                     if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
                         for (int i = -1; i <= 1; i++)
                             for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
-                                if (x + i >= 0 && x + i < InputImage.Size.Width && y + j >= 0 && y + j < InputImage.Size.Height)
+                                if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                                     if (!neighbourTags[edge[x + i, y + j]])
                                     {
                                         neighbourTags[edge[x + i, y + j]] = true;
@@ -1101,9 +1103,9 @@ namespace INFOIBV
 
         private void RegisterEdges()
         {
-            edge = new int[InputImage.Size.Width, InputImage.Size.Height];
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            edge = new int[width, height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
                     if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
@@ -1219,7 +1221,11 @@ namespace INFOIBV
             Color[,] OriginalImage = new Color[Image.GetLength(0), Image.GetLength(1)], grayImage = new Color[Image.GetLength(0), Image.GetLength(1)],
                 tagImage = new Color[Image.GetLength(0), Image.GetLength(1)], BinaryImage = new Color[Image.GetLength(0), Image.GetLength(1)], 
                 grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)], colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
+
             pipelineing = true;
+            label2.Visible = true;
+            label2.Text = "Creating edge image...";
+            Refresh();
 
             CopyImage(ref OriginalImage, Image);
             Grayscale();
@@ -1227,23 +1233,31 @@ namespace INFOIBV
             CopyImage(ref grayImage, Image);
             GetEdge(false);
             CopyImage(ref grayEdge, Image);
+            ShowImage();
             CopyImage(ref Image, OriginalImage);
             GetEdge(true);
             CopyImage(ref colorEdge, Image);
-
+            ShowImage();
             Or(grayEdge, colorEdge);
+            ShowImage();
+
+            label2.Text = "Creating binary image..."; Refresh();
             NiblackThresholding();
             ReduceBinaryNoise();
             RegisterEdges();
+            ShowImage();
+
+            label2.Text = "Tagging zones..."; Refresh();
             CopyImage(ref BinaryImage, Image);
             TagZones();
-            float[,] zoneDensities = BBDensityCompare();
+            ShowImage();
+
+            label2.Text = "Evaluating..."; Refresh();
             perimeterCounter = new double[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
                 BoundaryTrace(i);
             }
-            List<int>[] hasSurrounded = CheckIfZonesSurrounded();
             compactness = new double[tagNr + 1];
             circularity = new double[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
@@ -1251,8 +1265,13 @@ namespace INFOIBV
                 CompactnessAndCircularity(i);
             }
             CopyImage(ref Image, OriginalImage);
+
+            float[,] zoneDensities = BBDensityCompare();
+            List<int>[] hasSurrounded = CheckIfZonesSurrounded();
             GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
+            label2.Text = "";
+            label2.Visible = false;
             pipelineing = false;
         }
 
@@ -1269,8 +1288,8 @@ namespace INFOIBV
 
         private void CopyImage(ref Color[,] input, Color[,] toCopy)
         {
-            for (int x = 0; x < InputImage.Size.Width; x++)
-                for (int y = 0; y < InputImage.Size.Height; y++)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                     input[x, y] = toCopy[x, y];
         }
 
