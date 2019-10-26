@@ -451,7 +451,7 @@ namespace INFOIBV
                 {
                     double totalX = 0, totalY = 0;
                     double totalRX = 0, totalRY = 0, totalGX = 0, totalGY = 0, totalBX = 0, totalBY = 0;
-                    for (int i = -1; i <= 1; i++)                    
+                    for (int i = -1; i <= 1; i++)
                         for (int j = -1; j <= 1; j++)
                         {
                             if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
@@ -459,10 +459,10 @@ namespace INFOIBV
                                 if (!inColor)
                                 {
                                     totalX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
-                                    totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];                                    
+                                    totalY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];
                                 }
                                 else
-                                {                                                                     
+                                {
                                     totalRX += OriginalImage[x + i, y + j].R * edgeFilterX[i + 1, j + 1];
                                     totalRY += OriginalImage[x + i, y + j].R * edgeFilterY[i + 1, j + 1];
                                     totalGX += OriginalImage[x + i, y + j].G * edgeFilterX[i + 1, j + 1];
@@ -473,22 +473,26 @@ namespace INFOIBV
                             }
                             else
                             {
+                                int a = i, b = j;
+                                if (x + i < 0 || x + i >= width)
+                                    a = 0;
+                                if (y + j < 0 || y + j >= height)
+                                    b = 0;
                                 if (!inColor)
                                 {
-                                    totalX += 255 * edgeFilterX[i + 1, j + 1];
-                                    totalY += 255 * edgeFilterY[i + 1, j + 1];
+                                    totalX += OriginalImage[x + a, y + b].R * edgeFilterX[i + 1, j + 1];
+                                    totalY += OriginalImage[x + a, y + b].R * edgeFilterY[i + 1, j + 1];
                                 }
-                                else
+                                else // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                                 {
-                                    totalRX += 255 * edgeFilterX[i + 1, j + 1];
-                                    totalRY += 255 * edgeFilterY[i + 1, j + 1];
-                                    totalGX += 255 * edgeFilterX[i + 1, j + 1];
-                                    totalGY += 255 * edgeFilterY[i + 1, j + 1];
-                                    totalBX += 255 * edgeFilterX[i + 1, j + 1];
-                                    totalBY += 255 * edgeFilterY[i + 1, j + 1];
+                                    totalRX += OriginalImage[x + a, y + b].R * edgeFilterX[i + 1, j + 1];
+                                    totalRY += OriginalImage[x + a, y + b].R * edgeFilterY[i + 1, j + 1];
+                                    totalGX += OriginalImage[x + a, y + b].G * edgeFilterX[i + 1, j + 1];
+                                    totalGY += OriginalImage[x + a, y + b].G * edgeFilterY[i + 1, j + 1];
+                                    totalBX += OriginalImage[x + a, y + b].B * edgeFilterX[i + 1, j + 1];
+                                    totalBY += OriginalImage[x + a, y + b].B * edgeFilterY[i + 1, j + 1];
                                 }
                             }
-                            // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                         }
                     if (!inColor)
                     {
@@ -684,35 +688,82 @@ namespace INFOIBV
                         if (tagNeigbours[a].Any())
                         {
                             foreach (Point p in tagNeigbours[a])
+                            {
                                 ends.Add(p);
+                                Image[p.X, p.Y] = Color.Red;
+                            }
                             if (lastPoints)
                                 break;
-                            if (ends.Count >= 10)
+                            if (ends.Count >= Math.Max(edgeLineSizes[index] / 10, 2))
                                 break;
                             else if (ends.Count >= 2)
                                 lastPoints = true;
                         }
                     if (ends.Count < 2)
-                        continue;
-                    foreach (Point p in ends)                    
+                        continue;   // We can't draw a line between one point
+
+                    int maxDist = (int)Math.Max((width + height) / 2 * 0.15f, 5) + 10;
+
+                    foreach (Point p in ends)
                         foreach (Point q in ends)
                         {
+                            if (p == q)
+                                continue;
+                            if (Math.Abs(p.X - q.X) > maxDist || Math.Abs(p.Y - q.Y) > maxDist)
+                                continue;
                             // Check if two ends are relatively close to each other
-                            if (Math.Abs(p.X - q.X) + Math.Abs(p.Y - q.Y) < Math.Max((width + height) / 2 * 0.15f, 5))
+                            if (Math.Sqrt(Math.Pow(Math.Abs(p.X - q.X), 2) + Math.Pow(Math.Abs(p.Y - q.Y), 2)) < maxDist)
                             {
-                                int minX = Math.Max(Math.Min(p.X, q.X) - 10, 0), minY = Math.Max(Math.Min(p.Y, q.Y) - 10, 0);
-                                int maxX = Math.Min(Math.Max(p.X, q.X) + 10, width), maxY = Math.Min(Math.Max(p.Y, q.Y) + 10, height);
-                                // Make all pixels in a small area between them white if they have a minimal edgestrength
-                                for (int x = minX; x < maxX; x++)
-                                    for (int y = minY; y < maxY; y++)
-                                        if (Math.Sqrt(Math.Pow(Math.Abs(p.X - x), 2) + Math.Pow(Math.Abs(p.Y - y), 2)) < 10)        // If the pixel is within a 10 radius from p and q
-                                            if (Math.Sqrt(Math.Pow(Math.Abs(q.X - x), 2) + Math.Pow(Math.Abs(q.Y - y), 2)) < 10)
-                                                if (edImage[x, y].R > 20)       // <--- minimum edgestrength
-                                                    Image[x, y] = Color.FromArgb(0, 155, 155);
+                                // Methode 1 - pixels in the buurt op lage threshold
+
+                                //int radius = (int)(Math.Sqrt(Math.Pow(Math.Abs(p.X - q.X), 2) + Math.Pow(Math.Abs(p.Y - q.Y), 2)) / 2) + 1;
+                                //int minX = Math.Max(Math.Min(p.X, q.X) - radius, 0), minY = Math.Max(Math.Min(p.Y, q.Y) - radius, 0);
+                                //int maxX = Math.Min(Math.Max(p.X, q.X) + radius, width), maxY = Math.Min(Math.Max(p.Y, q.Y) + radius, height);
+                                //// Make all pixels in a small area between them white if they have a minimal edgestrength
+                                //for (int x = minX; x < maxX; x++)
+                                //    for (int y = minY; y < maxY; y++)
+                                //    {
+                                //        if (x == p.X && y == p.Y || x == q.X && y == p.Y)
+                                //            continue;
+                                //        if (Math.Sqrt(Math.Pow(Math.Abs(p.X - x), 2) + Math.Pow(Math.Abs(p.Y - y), 2)) < radius)        // If the pixel is within a radius from p and q
+                                //            if (Math.Sqrt(Math.Pow(Math.Abs(q.X - x), 2) + Math.Pow(Math.Abs(q.Y - y), 2)) < radius)
+                                //                if (edImage[x, y].R > 20)       // <--- minimum edgestrength
+                                //                    Image[x, y] = Color.FromArgb(0, 155, 155);
+                                //    }
+
+                                // Methode 2 - lijn van p naar q
+
+                                //Point diffVector = new Point(p.X - q.X, p.Y - q.Y);
+                                //bool horizontalLine = false;
+                                //double length = Math.Sqrt(Math.Pow(diffVector.X, 2) + Math.Pow(diffVector.Y, 2));
+                                //double normX = diffVector.X / length, normY = diffVector.Y / length;
+                                //if (normX >= normY)
+                                //    horizontalLine = true;
+                                //double scaleX = normX * (1 / normY), scaleY = normY * (1 / normX);
+                                //double newY, newX;
+
+                                //int minX = Math.Min(p.X, q.X), minY = Math.Min(p.Y, q.Y), maxX = Math.Max(p.X, q.X), maxY = Math.Max(p.Y, q.Y);
+                                //for (int x = minX; x <= maxX; x++)
+                                //    for (int y = minY; y <= maxY; y++)
+                                //    {
+                                //        if (!horizontalLine)
+                                //        {
+                                //            newY = (x - minX) * scaleY;
+                                //            if (Math.Abs(newY - y) < 2)
+                                //                Image[x, y] = Color.Orange;
+                                //        }
+                                //        else
+                                //        {
+                                //            newX = (y - minY) * scaleX;
+                                //            if (Math.Abs(newX - x) < 2)
+                                //                Image[x, y] = Color.Orange;
+                                //        }
+                                //    }
                             }
-                        }                    
+                        }
                 }
             }
+            //RegisterEdges();
         }
 
         private List<int> CountEdgeLineSizes()
@@ -1166,13 +1217,12 @@ namespace INFOIBV
                     }
                 }
             }
-
             return count;
         }
 
         // Checks if one zone surrounds another zone
         // Usefull for checking if something is a mug:
-        // The handle gap is always surrounded by the mug
+        // The handle gap is always surrounded by the mug (if the mug is seen from the side)
         private List<int>[] CheckIfZonesSurrounded()        // We kunnen nog toevoegen dat het een % uitrekend van welke tags om elke tag heen zitten, en dat met een hoog % een tag nogsteeds een andere omsingeld (vanwege thresholding fouten enzo kunnen er gaten in het handvat van de mok zitten)
         {
             List<int>[] hasSurrounded = new List<int>[tagNr + 1];
