@@ -51,7 +51,7 @@ namespace INFOIBV
         //This project was made by:
         //Steven van Blijderveen	5553083
         //Jeroen Hijzelendoorn		6262279
-        //As an assignment to be delivered by at most sunday 22 september 2019
+        //As an assignment to be delivered by at most sunday 27 oktober 2019
 
         private void applyButton_Click(object sender, EventArgs e)
         {
@@ -213,8 +213,8 @@ namespace INFOIBV
                 case ("Tag zones"):
                     TagZones();
                     break;
-                case ("Pipeline v1_0"):
-                    PipelineV1_0();
+                case ("Pipeline v1_1"):
+                    PipelineV1_1();
                     break;
                 case ("Nothing"):
                 default:
@@ -233,7 +233,7 @@ namespace INFOIBV
                 for (int y = 0; y < height; y++)                
                     OutputImage.SetPixel(x, y, Image[x, y]);                // Set the pixel color at coordinate (x,y)
             ap.Image = (Image)OutputImage;                                  // Display output image
-            Refresh();
+            ap.Refresh();
         }
 
         private void Negative()
@@ -1213,7 +1213,7 @@ namespace INFOIBV
             }
         }
 
-        private void PipelineV1_0()
+        private void PipelineV1_1()
         {
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
@@ -1224,8 +1224,7 @@ namespace INFOIBV
 
             pipelineing = true;
             label2.Visible = true;
-            label2.Text = "Creating edge image...";
-            Refresh();
+            label2.Text = "Creating edge image..."; ap.Refresh();
 
             CopyImage(ref OriginalImage, Image);
             Grayscale();
@@ -1241,18 +1240,19 @@ namespace INFOIBV
             Or(grayEdge, colorEdge);
             ShowImage();
 
-            label2.Text = "Creating binary image..."; Refresh();
+            label2.Text = "Creating binary image..."; ap.Refresh();
             NiblackThresholding();
             ReduceBinaryNoise();
             RegisterEdges();
             ShowImage();
+            System.Threading.Thread.Sleep(2500);
 
-            label2.Text = "Tagging zones..."; Refresh();
+            label2.Text = "Tagging zones..."; ap.Refresh();
             CopyImage(ref BinaryImage, Image);
             TagZones();
             ShowImage();
 
-            label2.Text = "Evaluating..."; Refresh();
+            label2.Text = "Evaluating..."; ap.Refresh();
             perimeterCounter = new double[tagNr + 1];
             for (int i = 0; i <= tagNr; i++)
             {
