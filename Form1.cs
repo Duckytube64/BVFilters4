@@ -72,8 +72,8 @@ namespace INFOIBV
 
             if (InputImage == null) return;                                 // Get out if no input image
             if (OutputImage != null) OutputImage.Dispose();                 // Reset output image
-            OutputImage = new Bitmap(InputImage.Size.Width, height); // Create new output image
-            Image = new Color[InputImage.Size.Width, height];       // Create array to speed-up operations (Bitmap functions are very slow)
+            OutputImage = new Bitmap(width, height); // Create new output image
+            Image = new Color[width, height];       // Create array to speed-up operations (Bitmap functions are very slow)
 
             // Setup progress bar
             progressBar.Visible = true;
@@ -543,7 +543,7 @@ namespace INFOIBV
         {
             // Some Niblack Thresholding variables, default (according to the internet): k = 0.2; filterradius = 15 (VERY SLOW); d = 0.
             double k = 0.2;
-            int filterradius = Math.Max(2, Math.Min((Image.GetLength(0) + Image.GetLength(1)) / 64, 10)) + 5;       // Depending on the image size, take a filterradius between 2 and 10
+            int filterradius = Math.Max(2, Math.Min((width + height) / 64, 10)) + 5;       // Depending on the image size, take a filterradius between 2 and 10
             int d = 15;
 
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
@@ -616,9 +616,9 @@ namespace INFOIBV
 
         private void ReduceBinaryNoise()
         {
-            bool[,] covered = new bool[Image.GetLength(0), Image.GetLength(1)];
-            for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
-                for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
+            bool[,] covered = new bool[width, height];
+            for (int x = 0; x < width; x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
+                for (int y = 0; y < height; y++)        // then find the next 0 that's not part of the previous group
                 {
                     if (edge[x, y] == 1 && !covered[x, y])
                     {
@@ -635,7 +635,7 @@ namespace INFOIBV
 
                             for (int i = -1; i <= 1; i++)
                                 for (int j = -1; j <= 1; j++)
-                                    if (X + i >= 0 && X + i < Image.GetLength(0) && Y + j >= 0 && Y + j < Image.GetLength(1))
+                                    if (X + i >= 0 && X + i < width && Y + j >= 0 && Y + j < height)
                                     {
                                         if (edge[X + i, Y + j] == 1 && !covered[X + i, Y + j])
                                         {
@@ -647,27 +647,26 @@ namespace INFOIBV
                         }
 
                         // If an edge segment covers less than 0.1% of the pixels, its probably not a mug, so we remove it from the image
-                        if (zonePoints.Count < (float)(Image.GetLength(0) * Image.GetLength(1)) / 100 * 0.1f)
-                            foreach(Point p in zonePoints)
-                            {
-                                edge[p.X, p.Y] = 0;
-                                Image[p.X, p.Y] = Color.Black;
-                            }
+                        if (zonePoints.Count < (float)(width * height) / 100 * 0.1f)
+                            foreach(Point p in zonePoints)                            
+                                Image[p.X, p.Y] = Color.Black;                            
                     }
                 }
+            RegisterEdges();
         }
 
         int[,] edgeTags;
 
         private void CompleteShapes()
         {
+            int searchRadius = 2;
             List<int> edgeLineSizes = CountEdgeLineSizes();
-            for (int index = 0; index < edgeLineSizes.Count; index++)
-            {
+            List<List<Point>> newLines = new List<List<Point>>();
+            for (int index = 0; index < edgeLineSizes.Count; index++)            
                 if (edgeLineSizes[index] > (int)Math.Max((width + height) * 0.2f, 15))
                 {
                     // Find the points on a edgeLine that 'sticks out the most' aka are on the end of the line with the fewest neighbours
-                    List<Point>[] tagNeigbours = new List<Point>[25];
+                    List<Point>[] tagNeigbours = new List<Point>[(int)Math.Pow(searchRadius * 2 + 1, 2) + 1];
                     for (int k = 0; k < tagNeigbours.Count(); k++)
                         tagNeigbours[k] = new List<Point>();
                     for (int x = 0; x < width; x++)
@@ -675,8 +674,8 @@ namespace INFOIBV
                             if (edgeTags[x,y] == index + 1)
                             {
                                 int count = 0;
-                                for (int i = -2; i < 2; i++)
-                                    for (int j = -2; j < 2; j++)
+                                for (int i = -searchRadius; i <= searchRadius; i++)
+                                    for (int j = -searchRadius; j <= searchRadius; j++)
                                         if (x + i >= 0 && y + j >= 0 && x + i < width && y + j < height)
                                             if (edgeTags[x + i, y + j] == index + 1)
                                                 count++;
@@ -684,17 +683,14 @@ namespace INFOIBV
                             }
                     List<Point> ends = new List<Point>();
                     bool lastPoints = false;
-                    for(int a = 0; a < tagNeigbours.Count(); a++)
-                        if (tagNeigbours[a].Any())
+                    for (int a = 0; a < tagNeigbours.Count() / 3; a++)      // If a has to go above tagNeighbours.Count / 3, it would mean that the pixels with the least amount
+                        if (tagNeigbours[a].Any())                          // of neighbours still have a lot of neighbours, which would mean that the edgeline probably has no end that need to be connected
                         {
-                            foreach (Point p in tagNeigbours[a])
-                            {
+                            foreach (Point p in tagNeigbours[a])                            
                                 ends.Add(p);
-                                Image[p.X, p.Y] = Color.Red;
-                            }
                             if (lastPoints)
                                 break;
-                            if (ends.Count >= Math.Max(edgeLineSizes[index] / 10, 2))
+                            if (ends.Count >= Math.Max(edgeLineSizes[index] / 10, 4))
                                 break;
                             else if (ends.Count >= 2)
                                 lastPoints = true;
@@ -702,8 +698,7 @@ namespace INFOIBV
                     if (ends.Count < 2)
                         continue;   // We can't draw a line between one point
 
-                    int maxDist = (int)Math.Max((width + height) / 2 * 0.15f, 5) + 10;
-
+                    int maxDist = (int)Math.Max((width + height) / 2 * 0.1f, 5);
                     Dictionary<Point, List<Point>> matchedPoints = new Dictionary<Point, List<Point>>();
 
                     foreach (Point p in ends)
@@ -717,60 +712,56 @@ namespace INFOIBV
                                     continue;
                             if (Math.Abs(p.X - q.X) > maxDist || Math.Abs(p.Y - q.Y) > maxDist)
                                 continue;
-                            // Check if two ends are relatively close to each other
+                            // Check if two ends are relatively close to each other and if so, draw a line following a simplified calculation
                             if (Math.Sqrt(Math.Pow(Math.Abs(p.X - q.X), 2) + Math.Pow(Math.Abs(p.Y - q.Y), 2)) < maxDist)
                             {
-                                // Methode 1 - pixels in the buurt op lage threshold
+                                Point diffVector = new Point(p.X - q.X, p.Y - q.Y);
+                                bool horizontalLine = false;
+                                double length = Math.Sqrt(Math.Pow(diffVector.X, 2) + Math.Pow(diffVector.Y, 2));
+                                double normX = diffVector.X / length, normY = diffVector.Y / length;
+                                if (Math.Abs(normX) >= Math.Abs(normY))
+                                    horizontalLine = true;
+                                double scaleX = normX * (1 / normY), scaleY = normY * (1 / normX);
+                                double newY, newX;
+                                int crossCount = 0;
+                                List<Point> linePoints = new List<Point>();
 
-                                //int radius = (int)(Math.Sqrt(Math.Pow(Math.Abs(p.X - q.X), 2) + Math.Pow(Math.Abs(p.Y - q.Y), 2)) / 2) + 1;
-                                //int minX = Math.Max(Math.Min(p.X, q.X) - radius, 0), minY = Math.Max(Math.Min(p.Y, q.Y) - radius, 0);
-                                //int maxX = Math.Min(Math.Max(p.X, q.X) + radius, width), maxY = Math.Min(Math.Max(p.Y, q.Y) + radius, height);
-                                //// Make all pixels in a small area between them white if they have a minimal edgestrength
-                                //for (int x = minX; x < maxX; x++)
-                                //    for (int y = minY; y < maxY; y++)
-                                //    {
-                                //        if (x == p.X && y == p.Y || x == q.X && y == p.Y)
-                                //            continue;
-                                //        if (Math.Sqrt(Math.Pow(Math.Abs(p.X - x), 2) + Math.Pow(Math.Abs(p.Y - y), 2)) < radius)        // If the pixel is within a radius from p and q
-                                //            if (Math.Sqrt(Math.Pow(Math.Abs(q.X - x), 2) + Math.Pow(Math.Abs(q.Y - y), 2)) < radius)
-                                //                if (edImage[x, y].R > 20)       // <--- minimum edgestrength
-                                //                    Image[x, y] = Color.FromArgb(0, 155, 155);
-                                //    }
+                                int minX = Math.Min(p.X, q.X), minY = Math.Min(p.Y, q.Y), maxX = Math.Max(p.X, q.X), maxY = Math.Max(p.Y, q.Y);
+                                for (int x = minX; x <= maxX; x++)
+                                    for (int y = minY; y <= maxY; y++)
+                                    {
+                                        if (horizontalLine)
+                                        {
+                                            newY = minY + (x - minX) * scaleY;
+                                            if (Math.Abs(newY - y) < 1f)
+                                            {
+                                                if (Image[x, y].R == 255)
+                                                    crossCount++;
+                                                linePoints.Add(new Point(x, y));
+                                            }
+                                        }
+                                        else
+                                        {
+                                            newX = minX + (y - minY) * scaleX;
+                                            if (Math.Abs(newX - x) < 1f)
+                                            {
+                                                if (Image[x, y].R == 255)
+                                                    crossCount++;
+                                                linePoints.Add(new Point(x, y));
+                                            }
+                                        }
+                                    }
 
-                                // Methode 2 - lijn van p naar q
-
-                                //Point diffVector = new Point(p.X - q.X, p.Y - q.Y);
-                                //bool horizontalLine = false;
-                                //double length = Math.Sqrt(Math.Pow(diffVector.X, 2) + Math.Pow(diffVector.Y, 2));
-                                //double normX = diffVector.X / length, normY = diffVector.Y / length;
-                                //if (normX >= normY)
-                                //    horizontalLine = true;
-                                //double scaleX = normX * (1 / normY), scaleY = normY * (1 / normX);
-                                //double newY, newX;
-
-                                //int minX = Math.Min(p.X, q.X), minY = Math.Min(p.Y, q.Y), maxX = Math.Max(p.X, q.X), maxY = Math.Max(p.Y, q.Y);
-                                //for (int x = minX; x <= maxX; x++)
-                                //    for (int y = minY; y <= maxY; y++)
-                                //    {
-                                //        if (!horizontalLine)
-                                //        {
-                                //            newY = (x - minX) * scaleY;
-                                //            if (Math.Abs(newY - y) < 2)
-                                //                Image[x, y] = Color.Orange;
-                                //        }
-                                //        else
-                                //        {
-                                //            newX = (y - minY) * scaleX;
-                                //            if (Math.Abs(newX - x) < 2)
-                                //                Image[x, y] = Color.Orange;
-                                //        }
-                                //    }
+                                if (crossCount < Math.Min(length / 3, 10))        // Check if the created line doesn't cross too many edge pixels - we don't want lines through good shapes                                
+                                    newLines.Add(linePoints);
                             }
                         }
                     }
-                }
-            }
-            //RegisterEdges();
+                }            
+            foreach (List<Point> lp in newLines)            // If we were to create the lines as soon as we have calculated them, they would possibly add to the crossCount of the following lines to be drawn
+                foreach (Point p in lp)                     // That's why we draw all lines in one go here
+                    Image[p.X, p.Y] = Color.White;           
+            RegisterEdges();
         }
 
         private List<int> CountEdgeLineSizes()
@@ -796,7 +787,7 @@ namespace INFOIBV
                             edgeTags[X, Y] = nrCount;
 
                             for (int i = -1; i <= 1; i = i + 2)
-                                if (X + i >= 0 && X + i < Image.GetLength(0))
+                                if (X + i >= 0 && X + i < width)
                                     if (edge[X + i, Y] == 1 && edgeTags[X + i, Y] == 0)
                                     {
                                         linePoints.Push(new Point(X + i, Y));
@@ -804,7 +795,7 @@ namespace INFOIBV
                                     }
 
                             for (int j = -1; j <= 1; j = j + 2)
-                                if (Y + j >= 0 && Y + j < Image.GetLength(1))
+                                if (Y + j >= 0 && Y + j < height)
                                     if (edge[X, Y + j] == 1 && edgeTags[X, Y + j] == 0)
                                     {
                                         linePoints.Push(new Point(X, Y + j));
@@ -1034,8 +1025,8 @@ namespace INFOIBV
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
                 }
 
-            for (int x = 0; x < Image.GetLength(0); x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
-                for (int y = 0; y < Image.GetLength(1); y++)        // then find the next 0 that's not part of the previous group
+            for (int x = 0; x < width; x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
+                for (int y = 0; y < height; y++)        // then find the next 0 that's not part of the previous group
                 {
                     if (edge[x, y] == 0)
                     {
@@ -1047,25 +1038,25 @@ namespace INFOIBV
                 }
 
             zoneSizes = CountZoneSizes();
-            int[,] newEdge = new int[Image.GetLength(0), Image.GetLength(1)];
+            int[,] newEdge = new int[width, height];
             bool pixelsDistributed = false;
 
             while (!pixelsDistributed)
             {
                 pixelsDistributed = true;
-                for (int x = 0; x < Image.GetLength(0); x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
-                    for (int y = 0; y < Image.GetLength(1); y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
+                for (int x = 0; x < width; x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
+                    for (int y = 0; y < height; y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
                         if (edge[x, y] == 1)
                         {
                             Image[x, y] = Color.Red;
                             bool[] tagNeighborhood = new bool[tagNr + 1];
-                            int minTagVal = Image.GetLength(0) * Image.GetLength(1) + 1;
+                            int minTagVal = width * height + 1;
                             int minTag = tagNr + 1;
                             int ceilingTag = tagNr + 1;
 
                             for (int i = -1; i <= 1; i++)               // Get the tag# of pixels in the 8 neighbourhood
                                 for (int j = -1; j <= 1; j++)
-                                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                                    if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                                         tagNeighborhood[edge[x + i, y + j]] = true;
 
                             for (int k = 2; k <= tagNr; k++)            // Find the tag with the smallest size, these tend to be foreground
@@ -1119,7 +1110,7 @@ namespace INFOIBV
                 int j = 0;
                 for (i = -1; i <= 1; i = i + 2)
                 {
-                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                    if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
@@ -1129,7 +1120,7 @@ namespace INFOIBV
                 j = 0;
                 for (j = -1; j <= 1; j = j + 2)
                 {
-                    if (x + i >= 0 && x + i < Image.GetLength(0) && y + j >= 0 && y + j < Image.GetLength(1))
+                    if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                     {
                         if (edge[x + i, y + j] == 0)
                             zonePoints.Push(new Point(x + i, y + j));
@@ -1142,9 +1133,9 @@ namespace INFOIBV
         {
             zoneSizes = new int[tagNr + 1];
             
-            for (int x = 0; x < Image.GetLength(0); x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y = 0; y < Image.GetLength(1); y++)
+                for (int y = 0; y < height; y++)
                 {
                     zoneSizes[edge[x, y]]++;
                 }
@@ -1242,8 +1233,9 @@ namespace INFOIBV
 
         private void CheckTag(int tag, List<int>[] hasSurrounded)      
         {
-            int neighbourCount = 0;
+            int neighbourCount = 0, perimeterlength = 0; ;
             bool[] neighbourTags = new bool[tagNr + 1];
+            double[] frequency = new double[tagNr + 1];
 
             for (int x = 0; x < width; x++)
                 for (int y = 0; y < height; y++)
@@ -1251,18 +1243,34 @@ namespace INFOIBV
                         for (int i = -1; i <= 1; i++)
                             for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
                                 if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
+                                {
                                     if (!neighbourTags[edge[x + i, y + j]])
                                     {
                                         neighbourTags[edge[x + i, y + j]] = true;
                                         neighbourCount++;
-                                        if (neighbourCount > 2)         // If there are more tag# than itself and 1 other, the tagzone is not surrounded by one tag, so we are done for this tag
-                                            return;
+                                        if (edge[x + i, y + j] != tag)
+                                            frequency[edge[x + i, y + j]]++;
                                     }
-
-            for (int k = 2; k <= tagNr; k++)                            // Otherwise, note which tag# is surrounding tag
+                                    else if (edge[x + i, y + j] != tag)                                    
+                                        frequency[edge[x + i, y + j]]++;                                    
+                                }
+            for (int i = 0; i <= tagNr; i++)
             {
-                if (neighbourTags[k] && k != tag)
-                    hasSurrounded[k].Add(tag);
+                frequency[i] /= perimeterCounter[tag];                  // We turn the frequency counts into % covered of the perimeter
+            }
+            for (int k = 2; k <= tagNr; k++)                            // Note which tag# is surrounding tag
+            {
+                if (neighbourTags[k] && k != tag && frequency[k] > 0.7f)    // If k has by far the highest surround frequency, we count it as if it surrounds it, because the line detection tends to create a lot of small zones within a mug handle
+                {
+                    bool onlyBigSurrounder = true;
+                    for (int l = 0; l <= tagNr; l++)
+                    {
+                        if (l != k && l != tag && frequency[l] > 0.15f)
+                            onlyBigSurrounder = false;
+                    }
+                    if (onlyBigSurrounder)
+                        hasSurrounded[k].Add(tag);
+                }
             }
         }
 
@@ -1293,11 +1301,11 @@ namespace INFOIBV
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                if (zoneSizes[tag] < Image.GetLength(0) * Image.GetLength(1) / 100 * 3)
+                if (zoneSizes[tag] < width * height / 100 * 3)
                     continue;
                 int minX = 512, minY = 512, maxX = 0, maxY = 0;
-                for (int x = 0; x < Image.GetLength(0); x++)
-                    for (int y = 0; y < Image.GetLength(1); y++)
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
                         if (edge[x, y] == tag)
                         {
                             if (x < minX)
@@ -1369,8 +1377,8 @@ namespace INFOIBV
 
             foreach(int tag in mugs)
             {
-                for (int x = 0; x < Image.GetLength(0); x++)
-                    for (int y = 0; y < Image.GetLength(1); y++)
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
                         if (edge[x, y] == tag)
                             Image[x, y] = Color.Red;
             }
@@ -1383,17 +1391,15 @@ namespace INFOIBV
             // Every method increases the progress bar as if it were the only method changing it
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
-            OriginalImage = new Color[Image.GetLength(0), Image.GetLength(1)];
-            grayImage = new Color[Image.GetLength(0), Image.GetLength(1)];
-            grayEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
-            colorEdge = new Color[Image.GetLength(0), Image.GetLength(1)];
-            edImage = new Color[Image.GetLength(0), Image.GetLength(1)];
-            BinaryImage = new Color[Image.GetLength(0), Image.GetLength(1)];
-            tagImage = new Color[Image.GetLength(0), Image.GetLength(1)];
+            OriginalImage = new Color[width, height];
+            grayImage = new Color[width, height];
+            grayEdge = new Color[width, height];
+            colorEdge = new Color[width, height];
+            edImage = new Color[width, height];
+            BinaryImage = new Color[width, height];
+            tagImage = new Color[width, height];
 
             pipelineing = true;
-            label2.Visible = true;
-            label2.Text = "Creating edge image..."; ap.Refresh();
 
             CopyImage(ref OriginalImage, Image);
             Grayscale();
@@ -1410,41 +1416,33 @@ namespace INFOIBV
             CopyImage(ref edImage, Image);
             ShowImage();
 
-            label2.Text = "Creating binary image..."; ap.Refresh();
             NiblackThresholding();
-            //hier ShapeCompletion
-            ReduceBinaryNoise();
-            RegisterEdges();
-            ShowImage();
             CompleteShapes();
-            //System.Threading.Thread.Sleep(2500);
+            ReduceBinaryNoise();
+            CopyImage(ref BinaryImage, Image);
+            ShowImage();
 
-            //label2.Text = "Tagging zones..."; ap.Refresh();
-            //CopyImage(ref BinaryImage, Image);
-            //TagZones();
-            //ShowImage();
+            TagZones();
+            ShowImage();
 
-            //label2.Text = "Evaluating..."; ap.Refresh();
-            //perimeterCounter = new double[tagNr + 1];
-            //for (int i = 0; i <= tagNr; i++)
-            //{
-            //    BoundaryTrace(i);
-            //}
-            //compactness = new double[tagNr + 1];
-            //circularity = new double[tagNr + 1];
-            //for (int i = 0; i <= tagNr; i++)
-            //{
-            //    CompactnessAndCircularity(i);
-            //}
-            //CopyImage(ref Image, OriginalImage);
+            perimeterCounter = new double[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)
+            {
+                BoundaryTrace(i);
+            }
+            compactness = new double[tagNr + 1];
+            circularity = new double[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)
+            {
+                CompactnessAndCircularity(i);
+            }
+            CopyImage(ref Image, OriginalImage);
 
-            //float[,] zoneDensities = BBDensityCompare();
-            //List<int>[] hasSurrounded = CheckIfZonesSurrounded();
-            //GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
+            float[,] zoneDensities = BBDensityCompare();
+            List<int>[] hasSurrounded = CheckIfZonesSurrounded();
+            GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
-            //label2.Text = "";
-            //label2.Visible = false;
-            //pipelineing = false;
+            pipelineing = false;
         }
 
         private void GetEdge(bool colorED)
