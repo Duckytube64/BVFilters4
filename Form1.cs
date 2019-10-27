@@ -300,13 +300,7 @@ namespace INFOIBV
         private void LinearFilter(int kernelsize)
         {
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }
-            }
+            CopyImage(ref OriginalImage, Image);
 
             int totalsize = (2 * kernelsize + 1) * (2 * kernelsize + 1);
 
@@ -334,13 +328,7 @@ namespace INFOIBV
         private void NonlinearFilter(int medianSize)
         {
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }
-            }
+            CopyImage(ref OriginalImage, Image);
 
             float[] pixelValues = new float[(int)Math.Pow(medianSize * 2 + 1, 2)];
 
@@ -392,13 +380,7 @@ namespace INFOIBV
             }
 
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }
-            }
+            CopyImage(ref OriginalImage, Image);
 
             for (int x = 0; x < width; x++)
             {
@@ -440,11 +422,7 @@ namespace INFOIBV
             }
 
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }            
+            CopyImage(ref OriginalImage, Image);
 
             for (int x = 0; x < width; x++)            
                 for (int y = 0; y < height; y++)
@@ -547,13 +525,7 @@ namespace INFOIBV
             int d = 15;
 
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    OriginalImage[x, y] = Image[x, y];
-                }
-            }
+            CopyImage(ref OriginalImage, Image);
 
             for (int x = 0; x < width; x++)
             {
@@ -928,13 +900,7 @@ namespace INFOIBV
             for (int Nr = 0; Nr < rounds; Nr++)
             {
                 Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-                for (int x = 0; x < width; x++)
-                {
-                    for (int y = 0; y < height; y++)
-                    {
-                        OriginalImage[x, y] = Image[x, y];
-                    }
-                }
+                CopyImage(ref OriginalImage, Image);
 
                 for (int x = 0; x < width; x++)
                 {
@@ -1133,13 +1099,9 @@ namespace INFOIBV
         {
             zoneSizes = new int[tagNr + 1];
             
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
+            for (int x = 0; x < width; x++)            
+                for (int y = 0; y < height; y++)                
                     zoneSizes[edge[x, y]]++;
-                }
-            }  
 
             return zoneSizes;
         }
@@ -1153,9 +1115,7 @@ namespace INFOIBV
             bool startFound = false;
             Point start = Point.Empty;
 
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                    OriginalImage[x, y] = Image[x, y];
+            CopyImage(ref OriginalImage, Image);
 
             for (int x = 0; x < width; x++)                 // Fill in the array of edge pixels
                 for (int y = 0; y < height; y++)
@@ -1179,8 +1139,7 @@ namespace INFOIBV
                 }
            
             double perimeter = CountBoundaryLength(start, potentialEdge);
-            perimeterCounter[tag] = perimeter;
-                       
+            perimeterCounter[tag] = perimeter;                       
         }
 
         private double CountBoundaryLength(Point start, bool[,] boundary)                  // Counts how long the outerBound is
@@ -1233,8 +1192,9 @@ namespace INFOIBV
 
         private void CheckTag(int tag, List<int>[] hasSurrounded)      
         {
-            int neighbourCount = 0, perimeterlength = 0; ;
+            int neighbourCount = 0;
             bool[] neighbourTags = new bool[tagNr + 1];
+            bool[,] alreadyChecked = new bool[width, height];
             double[] frequency = new double[tagNr + 1];
 
             for (int x = 0; x < width; x++)
@@ -1244,34 +1204,36 @@ namespace INFOIBV
                             for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
                                 if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
                                 {
-                                    if (!neighbourTags[edge[x + i, y + j]])
+                                    if (!alreadyChecked[x + i, y + j])
                                     {
-                                        neighbourTags[edge[x + i, y + j]] = true;
-                                        neighbourCount++;
+                                        if (!neighbourTags[edge[x + i, y + j]])
+                                        {
+                                            neighbourTags[edge[x + i, y + j]] = true;
+                                            neighbourCount++;
+                                        }
                                         if (edge[x + i, y + j] != tag)
                                             frequency[edge[x + i, y + j]]++;
-                                    }
-                                    else if (edge[x + i, y + j] != tag)                                    
-                                        frequency[edge[x + i, y + j]]++;                                    
+                                        alreadyChecked[x + i, y + j] = true;
+                                    }                               
                                 }
-            for (int i = 0; i <= tagNr; i++)
-            {
-                frequency[i] /= perimeterCounter[tag];                  // We turn the frequency counts into % covered of the perimeter
-            }
-            for (int k = 2; k <= tagNr; k++)                            // Note which tag# is surrounding tag
-            {
-                if (neighbourTags[k] && k != tag && frequency[k] > 0.7f)    // If k has by far the highest surround frequency, we count it as if it surrounds it, because the line detection tends to create a lot of small zones within a mug handle
+
+            int totNeighbours = 0;
+            for (int i = 0; i <= tagNr; i++)            
+                totNeighbours += (int)frequency[i];            
+            for (int i = 0; i <= tagNr; i++)            
+                frequency[i] /= totNeighbours;                              // We turn the frequency counts into % covered of the perimeter            
+            for (int k = 2; k <= tagNr; k++)                                // Note which tag# is surrounding tag     
+                if (neighbourTags[k] && k != tag && frequency[k] > 0.3f)    // If k has by far the highest surround frequency, we count it as if it surrounds it, because the line detection tends to create a lot of small zones within a mug handle
                 {
                     bool onlyBigSurrounder = true;
                     for (int l = 0; l <= tagNr; l++)
                     {
-                        if (l != k && l != tag && frequency[l] > 0.15f)
+                        if (l != k && l != tag && frequency[l] > 0.20f)
                             onlyBigSurrounder = false;
                     }
                     if (onlyBigSurrounder)
                         hasSurrounded[k].Add(tag);
-                }
-            }
+                }            
         }
 
         private void Or(Color[,] img1, Color[,] img2)
@@ -1301,7 +1263,7 @@ namespace INFOIBV
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                if (zoneSizes[tag] < width * height / 100 * 3)
+                if (zoneSizes[tag] < width * height / 100 * 1)
                     continue;
                 int minX = 512, minY = 512, maxX = 0, maxY = 0;
                 for (int x = 0; x < width; x++)
@@ -1346,6 +1308,7 @@ namespace INFOIBV
                 density4 = count4 / boxSize;
 
                 zoneDensities[tag, 0] = Math.Max(density1, density2) / Math.Min(density1, density2);
+                zoneDensities[tag, 1] = Math.Max(density3, density4) / Math.Min(density3, density4);
             }
             return zoneDensities;
         }
@@ -1357,21 +1320,33 @@ namespace INFOIBV
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                if (roundness[tag] > 0.65 && roundness[tag] < 0.75)
+                if (tag == 9)
+                    tag = tag;
+                if (roundness[tag] > 0.40 && roundness[tag] < 0.75)
                     grades[tag]++;
-                if (compactness[tag] > 0.04 && compactness[tag] < 0.06)
+                if (compactness[tag] > 0.02 && compactness[tag] < 0.06)
                     grades[tag]++;
-                if (zoneDensities[tag, 0] > 1.5 && zoneDensities[tag, 0] < 1.8)
+                if (zoneDensities[tag, 0] > 1.5 && zoneDensities[tag, 0] < 2.1)
                     grades[tag]++;
-                else if (zoneDensities[tag, 0] >= 1.8)
+                else if (zoneDensities[tag, 0] >= 2.1)
                     grades[tag]--;
                 if (zoneDensities[tag, 1] > 0.8 && zoneDensities[tag, 1] < 1.2)
                     grades[tag]++;
                 else if (zoneDensities[tag, 1] >= 1.2)
                     grades[tag]--;
                 if (hasSurrounded[tag].Any())
-                    grades[tag] += 2;
-                if (grades[tag] >= 4)
+                {
+                    bool bigHole = false;
+                    foreach(int t in hasSurrounded[tag])                    
+                        if (zoneSizes[t] > Math.Min((width + height), 700))
+                        {
+                            bigHole = true;
+                            break;
+                        }                    
+                    if (bigHole)
+                        grades[tag] += 2;
+                }
+                if (grades[tag] >= 5)
                     mugs.Add(tag);
             }
 
@@ -1401,6 +1376,7 @@ namespace INFOIBV
 
             pipelineing = true;
 
+            // Create an edge image
             CopyImage(ref OriginalImage, Image);
             Grayscale();
             ContrastAdjustment();
@@ -1416,30 +1392,30 @@ namespace INFOIBV
             CopyImage(ref edImage, Image);
             ShowImage();
 
+            // Convert to binary, tweak the image
             NiblackThresholding();
             CompleteShapes();
             ReduceBinaryNoise();
             CopyImage(ref BinaryImage, Image);
             ShowImage();
 
+            // Divide the image into zones
             TagZones();
             ShowImage();
 
+            // Analyze zones on their 'mug-ness'
             perimeterCounter = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)
-            {
-                BoundaryTrace(i);
-            }
+            for (int i = 2; i <= tagNr; i++)            
+                BoundaryTrace(i);            
             compactness = new double[tagNr + 1];
             circularity = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)
-            {
-                CompactnessAndCircularity(i);
-            }
+            for (int i = 0; i <= tagNr; i++)            
+                CompactnessAndCircularity(i);            
             CopyImage(ref Image, OriginalImage);
-
             float[,] zoneDensities = BBDensityCompare();
             List<int>[] hasSurrounded = CheckIfZonesSurrounded();
+
+            // Calculate a verdict
             GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
             pipelineing = false;
