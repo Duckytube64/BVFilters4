@@ -449,7 +449,7 @@ namespace INFOIBV
                                     totalBY += OriginalImage[x + i, y + j].B * edgeFilterY[i + 1, j + 1];
                                 }
                             }
-                            else
+                            else // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
                             {
                                 int a = i, b = j;
                                 if (x + i < 0 || x + i >= width)
@@ -461,7 +461,7 @@ namespace INFOIBV
                                     totalX += OriginalImage[x + a, y + b].R * edgeFilterX[i + 1, j + 1];
                                     totalY += OriginalImage[x + a, y + b].R * edgeFilterY[i + 1, j + 1];
                                 }
-                                else // If the selected pixel is out of bounds, count that pixel value as 255, otherwise white lines would always be created at the edges
+                                else 
                                 {
                                     totalRX += OriginalImage[x + a, y + b].R * edgeFilterX[i + 1, j + 1];
                                     totalRY += OriginalImage[x + a, y + b].R * edgeFilterY[i + 1, j + 1];
@@ -491,7 +491,6 @@ namespace INFOIBV
                         totalBY *= normalisationFactor;
                         double EdgeStrength = Math.Sqrt(totalRX * totalRX + totalRY * totalRY + totalGX * totalGX + totalGY * totalGY + totalBX * totalBX + totalBY * totalBY);
                         Image[x, y] = Color.FromArgb((int)EdgeStrength, (int)EdgeStrength, (int)EdgeStrength);
-
                     }
                 }            
         }
@@ -619,7 +618,7 @@ namespace INFOIBV
                         }
 
                         // If an edge segment covers less than 0.1% of the pixels, its probably not a mug, so we remove it from the image
-                        if (zonePoints.Count < (float)(width * height) / 100 * 0.1f)
+                        if (zonePoints.Count < (float)(width * height) / 100 * 0.2f)
                             foreach(Point p in zonePoints)                            
                                 Image[p.X, p.Y] = Color.Black;                            
                     }
@@ -991,7 +990,7 @@ namespace INFOIBV
                         throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
                 }
 
-            for (int x = 0; x < width; x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
+            for (int x = 0; x < width; x++)             // Tag a group of neighbouring pixels with 0 values in the edge array,
                 for (int y = 0; y < height; y++)        // then find the next 0 that's not part of the previous group
                 {
                     if (edge[x, y] == 0)
@@ -1010,7 +1009,7 @@ namespace INFOIBV
             while (!pixelsDistributed)
             {
                 pixelsDistributed = true;
-                for (int x = 0; x < width; x++)            // After floodfilling, a few edge pixels are left untagged as the algorithm is
+                for (int x = 0; x < width; x++)             // After floodfilling, a few edge pixels are left untagged as the algorithm is
                     for (int y = 0; y < height; y++)        // uncertain to which grouop it belongs, we look in the 8-neighbourhood and add it to the least recurring tag (min 1x)
                         if (edge[x, y] == 1)
                         {
@@ -1328,9 +1327,13 @@ namespace INFOIBV
                     grades[tag]++;
                 else if (zoneDensities[tag, 0] >= 2.1)
                     grades[tag]--;
+                else if (zoneDensities[tag, 0] <= 1.2)
+                    grades[tag]--;
                 if (zoneDensities[tag, 1] > 0.8 && zoneDensities[tag, 1] < 1.2)
                     grades[tag]++;
                 else if (zoneDensities[tag, 1] >= 1.2)
+                    grades[tag]--;
+                else if (zoneDensities[tag, 1] <= 0.5)
                     grades[tag]--;
                 if (hasSurrounded[tag].Any())
                 {
@@ -1432,20 +1435,20 @@ namespace INFOIBV
             TagZones();
             ShowImage();
 
-            // Analyze zones on their 'mug-ness'
+            //// Analyze zones on their 'mug-ness'
             perimeterCounter = new double[tagNr + 1];
-            for (int i = 2; i <= tagNr; i++)            
-                BoundaryTrace(i);            
+            for (int i = 2; i <= tagNr; i++)
+                BoundaryTrace(i);
             compactness = new double[tagNr + 1];
             circularity = new double[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)            
-                CompactnessAndCircularity(i);            
+            for (int i = 0; i <= tagNr; i++)
+                CompactnessAndCircularity(i);
             CopyImage(ref Image, OriginalImage);
             float[,] zoneDensities = BBDensityCompare();
             List<int>[] hasSurrounded = CheckIfZonesSurrounded();
 
-            // Calculate a verdict
-            GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
+            //// Calculate a verdict
+            //GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
             pipelineing = false;
         }
