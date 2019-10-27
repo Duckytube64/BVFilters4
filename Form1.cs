@@ -572,68 +572,12 @@ namespace INFOIBV
             RegisterEdges();
         }
 
-        private void RegisterEdges()
-        {
-            edge = new int[width, height];
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                {
-                    if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
-                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
-                    if (Image[x, y].R == 255)
-                        edge[x, y] = 1;
-                }
-        }
-
-        private void ReduceBinaryNoise()
-        {
-            bool[,] covered = new bool[width, height];
-            for (int x = 0; x < width; x++)            // Tag a group of neighbouring pixels with 0 values in the edge array,
-                for (int y = 0; y < height; y++)        // then find the next 0 that's not part of the previous group
-                {
-                    if (edge[x, y] == 1 && !covered[x, y])
-                    {
-                        Stack<Point> zonePointsStack = new Stack<Point>();
-                        List<Point> zonePoints = new List<Point>();
-                        zonePointsStack.Push(new Point(x, y));
-                        zonePoints.Add(new Point(x, y));
-                        covered[x, y] = true;
-
-                        while (zonePointsStack.Count > 0)
-                        {
-                            Point currPos = zonePointsStack.Pop();
-                            int X = currPos.X, Y = currPos.Y;
-
-                            for (int i = -1; i <= 1; i++)
-                                for (int j = -1; j <= 1; j++)
-                                    if (X + i >= 0 && X + i < width && Y + j >= 0 && Y + j < height)
-                                    {
-                                        if (edge[X + i, Y + j] == 1 && !covered[X + i, Y + j])
-                                        {
-                                            zonePointsStack.Push(new Point(X + i, Y + j));
-                                            zonePoints.Add(new Point(X + i, Y + j));
-                                            covered[X, Y] = true;
-                                        }
-                                    }
-                        }
-
-                        // If an edge segment covers less than 0.1% of the pixels, its probably not a mug, so we remove it from the image
-                        if (zonePoints.Count < (float)(width * height) / 100 * 0.2f)
-                            foreach(Point p in zonePoints)                            
-                                Image[p.X, p.Y] = Color.Black;                            
-                    }
-                }
-            RegisterEdges();
-        }
-
-        int[,] edgeTags;
-
         private void CompleteShapes()
         {
             int searchRadius = 2;
             List<int> edgeLineSizes = CountEdgeLineSizes();
             List<List<Point>> newLines = new List<List<Point>>();
-            for (int index = 0; index < edgeLineSizes.Count; index++)            
+            for (int index = 0; index < edgeLineSizes.Count; index++)
                 if (edgeLineSizes[index] > (int)Math.Max((width + height) * 0.2f, 15))
                 {
                     // Find the points on a edgeLine that 'sticks out the most' aka are on the end of the line with the fewest neighbours
@@ -642,7 +586,7 @@ namespace INFOIBV
                         tagNeigbours[k] = new List<Point>();
                     for (int x = 0; x < width; x++)
                         for (int y = 0; y < height; y++)
-                            if (edgeTags[x,y] == index + 1)
+                            if (edgeTags[x, y] == index + 1)
                             {
                                 int count = 0;
                                 for (int i = -searchRadius; i <= searchRadius; i++)
@@ -657,7 +601,7 @@ namespace INFOIBV
                     for (int a = 0; a < tagNeigbours.Count() / 3; a++)      // If a has to go above tagNeighbours.Count / 3, it would mean that the pixels with the least amount
                         if (tagNeigbours[a].Any())                          // of neighbours still have a lot of neighbours, which would mean that the edgeline probably has no end that need to be connected
                         {
-                            foreach (Point p in tagNeigbours[a])                            
+                            foreach (Point p in tagNeigbours[a])
                                 ends.Add(p);
                             if (lastPoints)
                                 break;
@@ -728,12 +672,68 @@ namespace INFOIBV
                             }
                         }
                     }
-                }            
+                }
             foreach (List<Point> lp in newLines)            // If we were to create the lines as soon as we have calculated them, they would possibly add to the crossCount of the following lines to be drawn
                 foreach (Point p in lp)                     // That's why we draw all lines in one go here
-                    Image[p.X, p.Y] = Color.White;           
+                    Image[p.X, p.Y] = Color.White;
             RegisterEdges();
         }
+
+        private void ReduceBinaryNoise()
+        {
+            bool[,] covered = new bool[width, height];
+            for (int x = 0; x < width; x++)             // Tag a group of neighbouring pixels with 0 values in the edge array,
+                for (int y = 0; y < height; y++)        // then find the next 0 that's not part of the previous group
+                {
+                    if (edge[x, y] == 1 && !covered[x, y])
+                    {
+                        Stack<Point> zonePointsStack = new Stack<Point>();
+                        List<Point> zonePoints = new List<Point>();
+                        zonePointsStack.Push(new Point(x, y));
+                        zonePoints.Add(new Point(x, y));
+                        covered[x, y] = true;
+
+                        while (zonePointsStack.Count > 0)
+                        {
+                            Point currPos = zonePointsStack.Pop();
+                            int X = currPos.X, Y = currPos.Y;
+
+                            for (int i = -1; i <= 1; i++)
+                                for (int j = -1; j <= 1; j++)
+                                    if (X + i >= 0 && X + i < width && Y + j >= 0 && Y + j < height)
+                                    {
+                                        if (edge[X + i, Y + j] == 1 && !covered[X + i, Y + j])
+                                        {
+                                            zonePointsStack.Push(new Point(X + i, Y + j));
+                                            zonePoints.Add(new Point(X + i, Y + j));
+                                            covered[X, Y] = true;
+                                        }
+                                    }
+                        }
+
+                        // If an edge segment covers less than 0.1% of the pixels, its probably not a mug, so we remove it from the image
+                        if (zonePoints.Count < (float)(width * height) / 100 * 0.2f)
+                            foreach(Point p in zonePoints)                            
+                                Image[p.X, p.Y] = Color.Black;                            
+                    }
+                }
+            RegisterEdges();
+        }
+
+        private void RegisterEdges()
+        {
+            edge = new int[width, height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                {
+                    if (Image[x, y] != Color.FromArgb(255, 255, 255) && Image[x, y] != Color.FromArgb(0, 0, 0) && Image[x, y] != Color.Black && Image[x, y] != Color.White)
+                        throw new ConstraintException("De input moet een binaire edge image zijn, dat is dit dus niet");
+                    if (Image[x, y].R == 255)
+                        edge[x, y] = 1;
+                }
+        }
+
+        int[,] edgeTags;
 
         private List<int> CountEdgeLineSizes()
         {
@@ -1070,7 +1070,7 @@ namespace INFOIBV
 
                 edge[x,y] = tagNr;
 
-                /// Ugly hardcoded 4-Neighborhood-way
+                // Check the 4-neighbourhood and add untagged 0-pixels to the stack
                 int i = 0;
                 int j = 0;
                 for (i = -1; i <= 1; i = i + 2)
@@ -1176,65 +1176,6 @@ namespace INFOIBV
             return count;
         }
 
-        // Checks if one zone surrounds another zone
-        // Usefull for checking if something is a mug:
-        // The handle gap is always surrounded by the mug (if the mug is seen from the side)
-        private List<int>[] CheckIfZonesSurrounded()        // We kunnen nog toevoegen dat het een % uitrekend van welke tags om elke tag heen zitten, en dat met een hoog % een tag nogsteeds een andere omsingeld (vanwege thresholding fouten enzo kunnen er gaten in het handvat van de mok zitten)
-        {
-            List<int>[] hasSurrounded = new List<int>[tagNr + 1];
-            for (int i = 0; i <= tagNr; i++)            
-                hasSurrounded[i] = new List<int>();            
-            for (int tag = 2; tag <= tagNr; tag++)            
-                CheckTag(tag, hasSurrounded);               // For each tag#...            
-            return hasSurrounded;
-        }
-
-        private void CheckTag(int tag, List<int>[] hasSurrounded)      
-        {
-            int neighbourCount = 0;
-            bool[] neighbourTags = new bool[tagNr + 1];
-            bool[,] alreadyChecked = new bool[width, height];
-            double[] frequency = new double[tagNr + 1];
-
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                    if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
-                        for (int i = -1; i <= 1; i++)
-                            for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
-                                if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
-                                {
-                                    if (!alreadyChecked[x + i, y + j])
-                                    {
-                                        if (!neighbourTags[edge[x + i, y + j]])
-                                        {
-                                            neighbourTags[edge[x + i, y + j]] = true;
-                                            neighbourCount++;
-                                        }
-                                        if (edge[x + i, y + j] != tag)
-                                            frequency[edge[x + i, y + j]]++;
-                                        alreadyChecked[x + i, y + j] = true;
-                                    }                               
-                                }
-
-            int totNeighbours = 0;
-            for (int i = 0; i <= tagNr; i++)            
-                totNeighbours += (int)frequency[i];            
-            for (int i = 0; i <= tagNr; i++)            
-                frequency[i] /= totNeighbours;                              // We turn the frequency counts into % covered of the perimeter            
-            for (int k = 2; k <= tagNr; k++)                                // Note which tag# is surrounding tag     
-                if (neighbourTags[k] && k != tag && frequency[k] > 0.3f)    // If k has by far the highest surround frequency, we count it as if it surrounds it, because the line detection tends to create a lot of small zones within a mug handle
-                {
-                    bool onlyBigSurrounder = true;
-                    for (int l = 0; l <= tagNr; l++)
-                    {
-                        if (l != k && l != tag && frequency[l] > 0.20f)
-                            onlyBigSurrounder = false;
-                    }
-                    if (onlyBigSurrounder)
-                        hasSurrounded[k].Add(tag);
-                }            
-        }
-
         private void Or(Color[,] img1, Color[,] img2)
         {
             if (new Point(img1.GetLength(0), img1.GetLength(1)) == new Point(img2.GetLength(0),img2.GetLength(1)))
@@ -1253,9 +1194,9 @@ namespace INFOIBV
             circularity[tag] = 4 * Math.PI * (zoneSizes[tag] / perimeterSquared);
         }
 
-        // If we take the boundingbox of a object and split it in two,
+        // If we take the boundingbox of a object and split it vertically in two,
         // there should be a noticable difference in the density of tag pixels between the two boxes
-        // if we have a mug, as the hole in the handle lowers the density significantly
+        // if we have a mug, as the hole in the handle lowers the density of one side significantly
         private float[,] BBDensityCompare()
         {
             float[,] zoneDensities = new float[tagNr + 1, 2];
@@ -1310,6 +1251,65 @@ namespace INFOIBV
                 zoneDensities[tag, 1] = Math.Max(density3, density4) / Math.Min(density3, density4);
             }
             return zoneDensities;
+        }
+        
+        // Checks if one zone surrounds another zone
+        // Usefull for checking if something is a mug:
+        // The handle gap is always surrounded by the mug (if the mug is seen from the side)
+        private List<int>[] CheckIfZonesSurrounded()
+        {
+            List<int>[] hasSurrounded = new List<int>[tagNr + 1];
+            for (int i = 0; i <= tagNr; i++)
+                hasSurrounded[i] = new List<int>();
+            for (int tag = 2; tag <= tagNr; tag++)
+                CheckTag(tag, hasSurrounded);               // For each tag#...            
+            return hasSurrounded;
+        }
+
+        private void CheckTag(int tag, List<int>[] hasSurrounded)
+        {
+            int neighbourCount = 0;
+            bool[] neighbourTags = new bool[tagNr + 1];
+            bool[,] alreadyChecked = new bool[width, height];
+            double[] frequency = new double[tagNr + 1];
+
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    if (edge[x, y] == tag)                              // For every pixel that has tag# tag...                        
+                        for (int i = -1; i <= 1; i++)
+                            for (int j = -1; j <= 1; j++)               // Check its 8 neighbourhood for the tag# of its surrounding pixels...
+                                if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
+                                {
+                                    if (!alreadyChecked[x + i, y + j])
+                                    {
+                                        if (!neighbourTags[edge[x + i, y + j]])
+                                        {
+                                            neighbourTags[edge[x + i, y + j]] = true;
+                                            neighbourCount++;
+                                        }
+                                        if (edge[x + i, y + j] != tag)
+                                            frequency[edge[x + i, y + j]]++;
+                                        alreadyChecked[x + i, y + j] = true;
+                                    }
+                                }
+
+            int totNeighbours = 0;
+            for (int i = 0; i <= tagNr; i++)
+                totNeighbours += (int)frequency[i];
+            for (int i = 0; i <= tagNr; i++)
+                frequency[i] /= totNeighbours;                              // We turn the frequency counts into % covered of the perimeter            
+            for (int k = 2; k <= tagNr; k++)                                // Note which tag# is surrounding tag     
+                if (neighbourTags[k] && k != tag && frequency[k] > 0.3f)    // If k has by far the highest surround frequency, we count it as if it surrounds it, because the line detection tends to create a lot of small zones within a mug handle
+                {
+                    bool onlyBigSurrounder = true;
+                    for (int l = 0; l <= tagNr; l++)
+                    {
+                        if (l != k && l != tag && frequency[l] > 0.20f)
+                            onlyBigSurrounder = false;
+                    }
+                    if (onlyBigSurrounder)
+                        hasSurrounded[k].Add(tag);
+                }
         }
 
         private void GradeMug(double[] roundness, double[] compactness, float[,] zoneDensities, List<int>[] hasSurrounded)
@@ -1391,7 +1391,7 @@ namespace INFOIBV
             MessageBox.Show(bbList, "Boundingboxes", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        Color[,] OriginalImage, grayImage, tagImage, BinaryImage, grayEdge, colorEdge, edImage;
+        Color[,] OriginalImage, BinaryImage, grayEdge, colorEdge;
 
         private void PipelineV1_1()
         {
@@ -1399,12 +1399,9 @@ namespace INFOIBV
             // Because we now use multiple methods at once, the progress bar would exceed 100%,
             // but for some reason this causes a significant slowdown in calculation time, so we shut it off temporarily
             OriginalImage = new Color[width, height];
-            grayImage = new Color[width, height];
             grayEdge = new Color[width, height];
             colorEdge = new Color[width, height];
-            edImage = new Color[width, height];
             BinaryImage = new Color[width, height];
-            tagImage = new Color[width, height];
 
             pipelineing = true;
 
@@ -1412,7 +1409,6 @@ namespace INFOIBV
             CopyImage(ref OriginalImage, Image);
             Grayscale();
             ContrastAdjustment();
-            CopyImage(ref grayImage, Image);
             GetEdge(false);
             CopyImage(ref grayEdge, Image);
             ShowImage();
@@ -1421,7 +1417,6 @@ namespace INFOIBV
             CopyImage(ref colorEdge, Image);
             ShowImage();
             Or(grayEdge, colorEdge);
-            CopyImage(ref edImage, Image);
             ShowImage();
 
             // Convert to binary, tweak the image
@@ -1435,7 +1430,7 @@ namespace INFOIBV
             TagZones();
             ShowImage();
 
-            //// Analyze zones on their 'mug-ness'
+            // Analyze zones on their 'mug-ness'
             perimeterCounter = new double[tagNr + 1];
             for (int i = 2; i <= tagNr; i++)
                 BoundaryTrace(i);
@@ -1447,8 +1442,8 @@ namespace INFOIBV
             float[,] zoneDensities = BBDensityCompare();
             List<int>[] hasSurrounded = CheckIfZonesSurrounded();
 
-            //// Calculate a verdict
-            //GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
+            // Calculate a verdict
+            GradeMug(circularity, compactness, zoneDensities, hasSurrounded);
 
             pipelineing = false;
         }
