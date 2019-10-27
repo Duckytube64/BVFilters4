@@ -133,12 +133,8 @@
             this.comboBox1.FormattingEnabled = true;
             this.comboBox1.Items.AddRange(new object[] {
             "Nothing",
-            "Negative",
             "Grayscale",
             "Contrast adjustment",
-            "Gaussian filter",
-            "Linear filter",
-            "Nonlinear filter",
             "Edge detection",
             "Thresholding",
             "NiblackThresholding",
@@ -147,7 +143,6 @@
             "Dilation",
             "Opening",
             "Closing",
-            "Value counting",
             "Reduce Binary Noise",
             "Tag zones",
             "Pipeline v1_1"});

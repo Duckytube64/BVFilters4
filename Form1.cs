@@ -95,52 +95,11 @@ namespace INFOIBV
 
             switch (filter)
             {
-                case ("Negative"):
-                    Negative();
-                    break;
                 case ("Grayscale"):
                     Grayscale();
                     break;
                 case ("Contrast adjustment"):
                     ContrastAdjustment();
-                    break;
-                case ("Linear filter"):
-                    int kernelsize;
-                    try
-                    {
-                        kernelsize = int.Parse(textBox1.Text);
-                    }
-                    catch
-                    {
-                        return;
-                    }
-                    LinearFilter(kernelsize);
-                    break;
-                case ("Nonlinear filter"):
-                    int medianSize;
-                    try
-                    {
-                        medianSize = int.Parse(textBox1.Text);
-                    }
-                    catch
-                    {
-                        return;
-                    }
-                    NonlinearFilter(medianSize);
-                    break;
-                case ("Gaussian filter"):
-                    float sigma;
-                    int kernelSize;
-                    try
-                    {
-                        kernelSize = int.Parse(textBox2.Text);                      // Try to get the kernelsize by parsing
-                        sigma = float.Parse(textBox1.Text);                         // Try to get the sigma by parsing
-                    }
-                    catch
-                    {
-                        return;
-                    }
-                    GaussianFilter(kernelSize, sigma);
                     break;
                 case ("Edge detection"):
                     EdgeDetection(comboBox2.Text, true);
@@ -204,9 +163,6 @@ namespace INFOIBV
                     }
                     Closing(rounds);
                     break;
-                case ("Value counting"):
-                    ValueCounting();
-                    break;
                 case ("Reduce Binary Noise"):
                     ReduceBinaryNoise();
                     break;
@@ -235,20 +191,7 @@ namespace INFOIBV
             ap.Image = (Image)OutputImage;                                  // Display output image
             ap.Refresh();
         }
-
-        private void Negative()
-        {
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                {
-                    Color pixelColor = Image[x, y];                         // Get the pixel color at coordinate (x,y)
-                    Color updatedColor = Color.FromArgb(255 - pixelColor.R, 255 - pixelColor.G, 255 - pixelColor.B); // Negative image
-                    Image[x, y] = updatedColor;                             // Set the new pixel color at coordinate (x,y)
-                    if (!pipelineing)
-                        progressBar.PerformStep();            // Increment progress bar
-                }
-        }
-
+        
         private void Grayscale()
         {
             for (int x = 0; x < width; x++)
@@ -296,112 +239,7 @@ namespace INFOIBV
                 }
             }
         }
-
-        private void LinearFilter(int kernelsize)
-        {
-            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            CopyImage(ref OriginalImage, Image);
-
-            int totalsize = (2 * kernelsize + 1) * (2 * kernelsize + 1);
-
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    int totalvalue = 0;
-                    for (int i = 0 - kernelsize; i <= kernelsize; i++)               // Loop over all pixels in the kernel and add their value to total value
-                    {
-                        for (int j = 0 - kernelsize; j <= kernelsize; j++)
-                        {
-                            if (x + i >= 0 && y + j >= 0 && x + i < width && y + j < height)        // If a pixel is out of image bounds, it has value 0
-                                totalvalue += OriginalImage[x + i, y + j].R;
-                        }
-                    }
-
-                    totalvalue /= totalsize;
-                    Image[x, y] = Color.FromArgb(totalvalue, totalvalue, totalvalue);
-                    progressBar.PerformStep();
-                }
-            }
-        }
-
-        private void NonlinearFilter(int medianSize)
-        {
-            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            CopyImage(ref OriginalImage, Image);
-
-            float[] pixelValues = new float[(int)Math.Pow(medianSize * 2 + 1, 2)];
-
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    float value = Image[x, y].R;                            // Get the pixel color at coordinate (x,y)
-                    int counter = 0;
-                    for (int i = -medianSize; i <= medianSize; i++)         // Get color values for all pixels in median range
-                    {
-                        for (int j = -medianSize; j <= medianSize; j++)
-                        {
-                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
-                            {
-                                pixelValues[counter] = (OriginalImage[x + i, y + j].R);
-                                counter++;
-                            }
-                        }
-                    }
-
-                    Array.Sort(pixelValues);
-                    int newValue = (int)pixelValues[pixelValues.Length / 2 + 1];
-                    Image[x, y] = Color.FromArgb(newValue, newValue, newValue);     // Set the new pixel color at coordinate (x,y)
-                    if (!pipelineing)
-                        progressBar.PerformStep();                    // Increment progress bar
-                }
-            }
-        }
-
-        private void GaussianFilter(int kernelsize, float sigma)
-        {
-            double euler = Math.E;
-
-            if (sigma < 0 || kernelsize < 0)
-                return;
-
-            double[,] weightskernel = new double[kernelsize * 2 + 1, kernelsize * 2 + 1];
-            double total = 0;
-
-            for (int i = -kernelsize; i <= kernelsize; i++)                 // Calculate initial weight for each cell in the kernel
-            {
-                for (int j = -kernelsize; j <= kernelsize; j++)
-                {
-                    double value = Math.Pow(euler, -(i * i + j * j) / (2 * sigma * sigma));
-                    weightskernel[i + kernelsize, j + kernelsize] = value;
-                    total += value;
-                }
-            }
-
-            Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
-            CopyImage(ref OriginalImage, Image);
-
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    double newGray = 0;
-                    for (int i = -kernelsize; i <= kernelsize; i++)
-                    {
-                        for (int j = -kernelsize; j <= kernelsize; j++)
-                        {
-                            if (x + i >= 0 && x + i < width && y + j >= 0 && y + j < height)
-                                newGray += (weightskernel[i + kernelsize, j + kernelsize] / total) * OriginalImage[x + i, y + j].R;       // Add the pixels fraction of its color to the new color of Image[x,y]
-                        }
-                    }
-                    Image[x, y] = Color.FromArgb((int)newGray, (int)newGray, (int)newGray);     // Update pixel in image
-                    if (!pipelineing)
-                        progressBar.PerformStep();                                // Increment progress bar
-                }
-            }
-        }
-
+        
         private void EdgeDetection(string filter, bool inColor)
         {
             double normalisationFactor;
@@ -947,33 +785,7 @@ namespace INFOIBV
             ErosionOrDialation(false, rounds);
             doubleProgress = false;
         }
-
-        private void ValueCounting()
-        {
-            chart1.Series.Clear();
-            chart1.ResetAutoValues();
-            int[] values = new int[256];
-            int valuecounter = 0;
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                {
-                    int value = Image[x, y].R;
-                    if (values[value] == 0)
-                    {
-                        valuecounter++;
-                    }
-                    values[value]++;
-                    if (!pipelineing)
-                        progressBar.PerformStep();                    // Increment progress bar
-                }            
-
-            var values1 = chart1.Series.Add("Values");
-            for (int i = 0; i < 256; i++)            
-                values1.Points.AddY(values[i]);            
-
-            label1.Text = "Aantal values: " + valuecounter;
-        }
-
+        
         int tagNr;
         int[] zoneSizes;
 
@@ -1107,8 +919,7 @@ namespace INFOIBV
         
         private void BoundaryTrace(int tag)
         {
-            // For the BoundaryTrace we chose an 8-neighbourhood to determine if a pixel is a boundary
-            // This is because we believe that pixels aren't really part of an edge if they aren't directly next to a white pixel
+            // For the BoundaryTrace we chose a 4-neighbourhood to determine if a pixel is a boundary
             potentialEdge = new bool[width, height]; // Initialize boolian array to keep track of boundary pixels
             Color[,] OriginalImage = new Color[width, height];   // Duplicate the original image
             bool startFound = false;
@@ -1126,7 +937,7 @@ namespace INFOIBV
                             start = new Point(x, y);
                             startFound = true;
                         }
-                        for (int i = -1; i <= 1; i++)                       // Check the entire 8-neighbourhood for pixels with another tag                        
+                        for (int i = -1; i <= 1; i++)                       // Check the entire 4-neighbourhood for pixels with another tag                        
                             for (int j = -1; j <= 1; j++)
                                 if (x + i > 0 && y + j > 0 && x + i < width && y + j < height && edge[x + i, y + j] != tag && (i == 0 || j == 0))
                                     potentialEdge[x, y] = true;
