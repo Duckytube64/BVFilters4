@@ -1055,7 +1055,7 @@ namespace INFOIBV
                     else if (tag == 0)
                         Image[i, j] = Color.FromArgb(0, 0, 0);
                     else
-                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 421 * tag % 256);    // Jeroen Hijzelendoorn's highly advanced random color generator *tm
+                        Image[i, j] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 421 * tag % 256);    // Random color generator
                 }
         }
         
@@ -1348,13 +1348,44 @@ namespace INFOIBV
                     mugs.Add(tag);
             }
 
-            foreach(int tag in mugs)
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                        Image[x, y] = Color.Black;
+
+            List<Point> boundingBoxes = new List<Point>();
+
+            foreach (int tag in mugs)
             {
+                int minX = width, minY = height, maxX = 0, maxY = 0;
                 for (int x = 0; x < width; x++)
                     for (int y = 0; y < height; y++)
                         if (edge[x, y] == tag)
-                            Image[x, y] = Color.Red;
+                        {
+                            Image[x, y] = Color.FromArgb(231 * tag % 256, 301 * tag % 256, 421 * tag % 256);
+                            if (x < minX)
+                                minX = x;
+                            else if (x > maxX)
+                                maxX = x;
+                            if (y < minY)
+                                minY = y;
+                            else if (y > maxY)
+                                maxY = y;
+                        }
+                boundingBoxes.Add(new Point(minX, minY));
+                boundingBoxes.Add(new Point(maxX, maxY));
             }
+
+            ShowImage();
+
+            string bbList = "";
+            int count = 1;
+
+            for (int i = 0; i < boundingBoxes.Count; i+= 2)
+            {
+                bbList += "object " + count + ": (" + boundingBoxes[i].X + ", " + boundingBoxes[i].Y + ") - (" + boundingBoxes[i + 1].X + ", " + boundingBoxes[i + 1].Y + ") \n";
+                count++;
+            }
+            MessageBox.Show(bbList, "Boundingboxes", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         Color[,] OriginalImage, grayImage, tagImage, BinaryImage, grayEdge, colorEdge, edImage;
