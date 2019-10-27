@@ -1320,8 +1320,6 @@ namespace INFOIBV
 
             for (int tag = 2; tag <= tagNr; tag++)
             {
-                if (tag == 9)
-                    tag = tag;
                 if (roundness[tag] > 0.40 && roundness[tag] < 0.75)
                     grades[tag]++;
                 if (compactness[tag] > 0.02 && compactness[tag] < 0.06)
